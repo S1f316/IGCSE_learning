@@ -1907,5 +1907,8 @@ def delete_word(card_id):
     except Exception as e:
         return jsonify({'status': 'error', 'message': f'删除卡片时出错: {str(e)}'})
 
+# 在文件末尾添加端口绑定代码
 if __name__ == '__main__':
-    app.run(debug=True) 
+    # 获取环境变量中的端口，如果不存在则使用默认的5000
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=True) 
