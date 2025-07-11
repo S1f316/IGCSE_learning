@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ unit_name }} 单词状态 - IGCSE Mathematics 0580</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .cards-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .card-title {
+            margin: 0;
+            color: #333;
+            font-size: 20px;
+        }
+        
+        .card-content {
+            display: flex;
+            flex-wrap: wrap;
+        }
+        
+        .card-left {
+            flex: 1;
+            min-width: 300px;
+            padding-right: 20px;
+        }
+        
+        .card-right {
+            flex: 1;
+            min-width: 300px;
+        }
+        
+        .memory-stats {
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #f5f5f5;
+            border-radius: 5px;
+        }
+        
+        .stats-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #333;
+        }
+        
+        .stats-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+        
+        .stats-label {
+            font-weight: bold;
+            color: #555;
+        }
+        
+        .stats-value {
+            color: #4CAF50;
+        }
+        
+        .memory-curve {
+            height: 250px;
+            margin-top: 20px;
+        }
+        
+        .review-history {
+            margin-top: 20px;
+        }
+        
+        .review-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .review-date {
+            color: #666;
+        }
+        
+        .review-rating {
+            font-weight: bold;
+        }
+        
+        .rating-1 { color: #dc3545; }
+        .rating-2 { color: #ffc107; }
+        .rating-3 { color: #28a745; }
+        .rating-4 { color: #17a2b8; }
+        
+        .no-cards-message {
+            text-align: center;
+            padding: 40px 0;
+            color: #666;
+        }
+        
+        .unit-header {
+            margin: 20px 0;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>{{ unit_name }} - 单词状态</h1>
+    </header>
+    
+    <main>
+        <div class="navigation">
+            <a href="{{ url_for('word_stats') }}" class="btn btn-secondary">← 返回单元列表</a>
+            <a href="{{ url_for('index') }}" class="btn btn-primary">返回主页</a>
+        </div>
+        
+        <div class="unit-header">
+            <h2>{{ unit_name }} - 已学习单词状态</h2>
+            <p>查看已学习单词的记忆状态、记忆曲线和复习历史</p>
+        </div>
+        
+        <div class="cards-container">
+            {% if viewed_cards %}
+                {% for card in viewed_cards %}
+                <div class="card" id="card-{{ card.id }}">
+                    <div class="card-header">
+                        <h3 class="card-title">{{ card.front|safe }}</h3>
+                    </div>
+                    
+                    <div class="card-content">
+                        <div class="card-left">
+                            <div class="memory-stats">
+                                <div class="stats-title">记忆状态</div>
+                                <div class="stats-row">
+                                    <span class="stats-label">稳定性:</span>
+                                    <span class="stats-value">{{ card.memory_state.stability|round(2) if card.memory_state else '1.00' }}</span>
+                                </div>
+                                <div class="stats-row">
+                                    <span class="stats-label">难度:</span>
+                                    <span class="stats-value">{{ card.memory_state.difficulty|round(2) if card.memory_state else '5.00' }}</span>
+                                </div>
+                                <div class="stats-row">
+                                    <span class="stats-label">复习次数:</span>
+                                    <span class="stats-value">{{ card.review_logs|length }}</span>
+                                </div>
+                                <div class="stats-row">
+                                    <span class="stats-label">下次复习:</span>
+                                    <span class="stats-value">{{ card.due_date.strftime('%Y-%m-%d') }}</span>
+                                </div>
+                                <div class="stats-row">
+                                    <span class="stats-label">创建于:</span>
+                                    <span class="stats-value">{{ card.created_at.strftime('%Y-%m-%d') }}</span>
+                                </div>
+                            </div>
+                            
+                            {% if card.review_logs %}
+                            <div class="review-history">
+                                <div class="stats-title">复习历史</div>
+                                {% for log in card.review_logs|reverse %}
+                                <div class="review-item">
+                                    <span class="review-date">{{ log.timestamp.strftime('%Y-%m-%d %H:%M') }}</span>
+                                    <span class="review-rating rating-{{ log.rating }}">
+                                        {{ ['', '重来', '困难', '良好', '简单'][log.rating] }}
+                                    </span>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="card-right">
+                            <div class="memory-curve">
+                                <canvas id="curve-{{ card.id }}"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="no-cards-message">
+                    <p>此单元还没有已学习的单词。</p>
+                    <p>请先在学习页面学习单词，然后再查看单词状态。</p>
+                </div>
+            {% endif %}
+        </div>
+    </main>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            {% for card in viewed_cards %}
+                drawMemoryCurve('{{ card.id }}', {{ card.memory_state.stability|round(2) if card.memory_state else 1.0 }});
+            {% endfor %}
+        });
+        
+        // 绘制记忆曲线
+        function drawMemoryCurve(cardId, stability) {
+            const canvas = document.getElementById(`curve-${cardId}`);
+            if (!canvas) return;
+            
+            // 生成记忆曲线数据
+            const days = 30; // 显示30天的曲线
+            const labels = Array.from({length: days}, (_, i) => `第${i+1}天`);
+            const data = [];
+            
+            // 记忆保留率计算公式: R(t) = e^(-t/S)
+            // 其中t是时间，S是稳定性
+            for (let i = 0; i < days; i++) {
+                const retention = Math.exp(-(i+1) / stability);
+                data.push(retention * 100); // 转换为百分比
+            }
+            
+            // 创建图表
+            const ctx = canvas.getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: '记忆保留率(%)',
+                        data: data,
+                        borderColor: '#4CAF50',
+                        backgroundColor: 'rgba(76, 175, 80, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            title: {
+                                display: true,
+                                text: '记忆保留率(%)'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: '天数'
+                            }
+                        }
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: '记忆曲线预测'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `记忆保留率: ${context.raw.toFixed(1)}%`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html> 

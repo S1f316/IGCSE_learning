@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}IGCSE Mathematics 0580{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        /* 导航栏样式 */
+        .navbar {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            padding: 10px 20px;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #eee;
+            position: relative;
+        }
+        
+        .logout-btn {
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background-color 0.2s;
+            margin-left: 20px;
+        }
+        
+        .logout-btn:hover {
+            background-color: #c82333;
+        }
+        
+        /* 用户信息样式 */
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #6c757d;
+        }
+        
+        .user-avatar {
+            width: 30px;
+            height: 30px;
+            background-color: #6c757d;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: white;
+        }
+        
+        /* 用户名链接样式 */
+        .username-link {
+            color: #3498db;
+            text-decoration: none;
+            transition: color 0.2s;
+            font-weight: 500;
+        }
+        
+        .username-link:hover {
+            color: #2980b9;
+            text-decoration: underline;
+        }
+        
+        /* 内容容器 */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 15px;
+        }
+        
+        /* 页脚样式 */
+        footer {
+            margin-top: 40px;
+            text-align: center;
+            padding: 20px;
+            color: #6c757d;
+            font-size: 14px;
+            border-top: 1px solid #eee;
+        }
+    </style>
+    {% block styles %}{% endblock %}
+</head>
+<body>
+    <nav class="navbar">
+        <div class="user-info">
+            <div class="user-avatar">{{ session.username[0].upper() if session.username else 'U' }}</div>
+            <a href="{{ url_for('profile') }}" class="username-link">{{ session.username if session.username else '用户' }}</a>
+            <a href="{{ url_for('logout') }}" class="logout-btn">登出</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        {% block content %}{% endblock %}
+    </div>
+    
+    <footer>
+        <p>FSRS Demo - IGCSE Mathematics 0580</p>
+    </footer>
+    
+    {% block scripts %}{% endblock %}
+</body>
+</html> 

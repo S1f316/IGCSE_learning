@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IGCSE Mathematics 0580 - 复习</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .card {
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            background-color: #fff;
+            transition: transform 0.3s;
+        }
+        
+        .card-content {
+            min-height: 200px;
+            font-size: 18px;
+            line-height: 1.6;
+            margin-bottom: 20px;
+            padding: 20px;
+            border-radius: 8px;
+            background-color: #f8f9fa;
+        }
+        
+        .card-front, .card-back {
+            width: 100%;
+        }
+        
+        .card-back {
+            display: none;
+            border-top: 1px solid #eee;
+            margin-top: 20px;
+            padding-top: 20px;
+        }
+        
+        .rating-buttons {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+        }
+        
+        .rating-button {
+            flex: 1;
+            margin: 0 5px;
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        
+        .again {
+            background-color: #dc3545;
+        }
+        
+        .hard {
+            background-color: #ffc107;
+            color: #212529;
+        }
+        
+        .good {
+            background-color: #28a745;
+        }
+        
+        .easy {
+            background-color: #17a2b8;
+        }
+        
+        .button-container {
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        .show-answer-button {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        .stats-container {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+            font-size: 14px;
+            color: #6c757d;
+        }
+        
+        .no-cards-message {
+            text-align: center;
+            margin: 40px auto;
+            font-size: 18px;
+        }
+        
+        .card-counter {
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 14px;
+            color: #6c757d;
+        }
+        
+        .home-link {
+            display: block;
+            text-align: center;
+            margin: 20px auto;
+            color: #007bff;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>IGCSE Mathematics 0580 - 复习</h1>
+        <div style="text-align: center; margin-top: 10px; font-size: 14px; color: #666;">
+            FSRS参数调整进度: <span style="font-weight: bold; color: {% if learned_words_count >= fsrs_adjustment_threshold %}#28a745{% else %}#007bff{% endif %};">{{ learned_words_count }}/{{ fsrs_adjustment_threshold }}</span>
+            {% if learned_words_count >= fsrs_adjustment_threshold %}
+            <span style="color: #28a745; font-weight: bold;">✓ 已达到调整阈值</span>
+            {% endif %}
+        </div>
+    </header>
+    
+    <main>
+        {% if card %}
+        <div class="card" id="currentCard" data-id="{{ card.id }}">
+            <div class="card-front card-content">
+                {{ card.front|safe }}
+            </div>
+            
+            <div class="button-container">
+                <button class="show-answer-button" id="showAnswer">显示答案</button>
+            </div>
+            
+            <div class="card-back card-content" id="cardBack">
+                {{ card.back|safe }}
+                
+                <div class="rating-buttons">
+                    <button class="rating-button again" data-rating="1">
+                        <div>重来</div>
+                        <div>&lt; 1分钟</div>
+                    </button>
+                    <button class="rating-button hard" data-rating="2">
+                        <div>困难</div>
+                        <div>{{ hard_interval }}天</div>
+                    </button>
+                    <button class="rating-button good" data-rating="3">
+                        <div>良好</div>
+                        <div>{{ good_interval }}天</div>
+                    </button>
+                    <button class="rating-button easy" data-rating="4">
+                        <div>简单</div>
+                        <div>{{ easy_interval }}天</div>
+                    </button>
+                </div>
+                
+                <div class="stats-container">
+                    <span>难度: {{ card.memory_state.difficulty|round(2) if card.memory_state else 'N/A' }}</span>
+                    <span>稳定性: {{ card.memory_state.stability|round(2) if card.memory_state else 'N/A' }}</span>
+                    {% if overdue_days > 0 %}
+                    <span style="color: #dc3545;">过期: {{ overdue_days }}天</span>
+                    {% endif %}
+                    <span>FSRS: {{ learned_words_count }}/{{ fsrs_adjustment_threshold }}</span>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="no-cards-message">
+            <p>没有需要复习的卡片！</p>
+            <p>所有卡片都已按计划复习完毕。</p>
+            <button id="refreshButton" class="show-answer-button" style="margin-top: 20px;">刷新复习队列</button>
+        </div>
+        {% endif %}
+        
+        <a href="{{ url_for('index') }}" class="home-link">返回主页</a>
+    </main>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // 显示答案按钮
+            const showAnswerButton = document.getElementById('showAnswer');
+            const cardBack = document.getElementById('cardBack');
+            
+            if (showAnswerButton) {
+                showAnswerButton.addEventListener('click', function() {
+                    cardBack.style.display = 'block';
+                    this.style.display = 'none';
+                });
+            }
+            
+            // 刷新按钮
+            const refreshButton = document.getElementById('refreshButton');
+            if (refreshButton) {
+                refreshButton.addEventListener('click', function() {
+                    window.location.reload();
+                });
+            }
+            
+            // 评分按钮
+            const ratingButtons = document.querySelectorAll('.rating-button');
+            ratingButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const rating = parseInt(this.getAttribute('data-rating'));
+                    const cardId = document.getElementById('currentCard').getAttribute('data-id');
+                    
+                    // 禁用所有按钮，防止重复点击
+                    ratingButtons.forEach(btn => btn.disabled = true);
+                    
+                    console.log('发送评分:', { card_id: cardId, rating: rating });
+                    
+                    // 发送评分
+                    fetch('/rate_card', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            card_id: cardId,
+                            rating: rating
+                        })
+                    })
+                    .then(response => {
+                        console.log('收到响应:', response);
+                        return response.json();
+                    })
+                    .then(data => {
+                        console.log('响应数据:', data);
+                        if (data.status === 'success') {
+                            // 如果有下一张卡片，加载它
+                            if (data.next_card) {
+                                window.location.reload();
+                            } else {
+                                // 显示完成消息
+                                document.getElementById('currentCard').innerHTML = `
+                                    <div class="card-content">
+                                        <p style="text-align: center; font-size: 20px;">恭喜你！</p>
+                                        <p style="text-align: center;">你已完成今天的复习任务。</p>
+                                    </div>
+                                `;
+                            }
+                        } else {
+                            // 启用所有按钮
+                            ratingButtons.forEach(btn => btn.disabled = false);
+                            alert('评分失败: ' + (data.message || '请稍后再试'));
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        // 启用所有按钮
+                        ratingButtons.forEach(btn => btn.disabled = false);
+                        alert('评分失败，请稍后再试');
+                    });
+                });
+            });
+            
+            // 快捷键
+            document.addEventListener('keydown', function(e) {
+                if (cardBack.style.display === 'none' || cardBack.style.display === '') {
+                    // 空格键显示答案
+                    if (e.code === 'Space') {
+                        e.preventDefault();
+                        if (showAnswerButton) {
+                            showAnswerButton.click();
+                        }
+                    }
+                } else {
+                    // 数字键1-4对应评分
+                    if (e.key >= '1' && e.key <= '4') {
+                        e.preventDefault();
+                        const rating = parseInt(e.key);
+                        const button = document.querySelector(`.rating-button[data-rating="${rating}"]`);
+                        if (button) {
+                            button.click();
+                        }
+                    }
+                }
+            });
+        });
+    </script>
+</body>
+</html> 

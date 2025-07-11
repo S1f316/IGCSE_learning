@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FSRS 算法分析 - IGCSE Mathematics 0580</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .analytics-container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .analytics-card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .analytics-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .analytics-title {
+            margin: 0;
+            color: #333;
+            font-size: 20px;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin: 20px 0;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        
+        .stat-box {
+            background: #f9f9f9;
+            border-radius: 5px;
+            padding: 15px;
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #4CAF50;
+            margin: 5px 0;
+        }
+        
+        .stat-label {
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid #ddd;
+            margin-bottom: 20px;
+        }
+        
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border: 1px solid transparent;
+            border-bottom: none;
+            margin-right: 5px;
+            border-radius: 5px 5px 0 0;
+        }
+        
+        .tab.active {
+            background-color: white;
+            border-color: #ddd;
+            color: #4CAF50;
+            font-weight: bold;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .params-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 14px;
+        }
+        
+        .params-table th, .params-table td {
+            padding: 8px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .params-table th {
+            background-color: #f5f5f5;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>FSRS 算法分析</h1>
+        <div style="text-align: center; margin-top: 10px; font-size: 14px; color: #666;">
+            FSRS参数调整进度: 
+            <span style="font-weight: bold; color: {% if learned_words_count >= fsrs_adjustment_threshold|default(50) %}#28a745{% else %}#007bff{% endif %};">
+                {{ learned_words_count }}/{{ fsrs_adjustment_threshold|default(50) }}
+            </span>
+            {% if learned_words_count >= fsrs_adjustment_threshold|default(50) %}
+            <span style="color: #28a745; font-weight: bold;">✓ 已达到调整阈值</span>
+            {% endif %}
+        </div>
+    </header>
+    
+    <main>
+        <div class="navigation">
+            <a href="{{ url_for('index') }}" class="btn btn-secondary">← 返回主页</a>
+        </div>
+        
+        <div class="analytics-container">
+            <div class="tabs">
+                <div class="tab active" data-tab="overview">总览</div>
+                <div class="tab" data-tab="workload">工作量预测</div>
+                <div class="tab" data-tab="parameters">算法参数</div>
+            </div>
+            
+            <!-- 总览标签页 -->
+            <div id="overview" class="tab-content active">
+                <div class="analytics-card">
+                    <div class="analytics-header">
+                        <h3 class="analytics-title">学习统计</h3>
+                    </div>
+                    
+                    <div class="stats-grid">
+                        <div class="stat-box">
+                            <div class="stat-label">总卡片数</div>
+                            <div class="stat-value">{{ stats.total }}</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-label">已学习</div>
+                            <div class="stat-value">{{ stats.learned }}</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-label">待复习</div>
+                            <div class="stat-value">{{ stats.due }}</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-label">平均稳定性</div>
+                            <div class="stat-value">{{ "%.1f"|format(stats.avg_stability) }}</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="analytics-card">
+                    <div class="analytics-header">
+                        <h3 class="analytics-title">FSRS参数调整进度</h3>
+                    </div>
+                    
+                    <div style="padding: 15px;">
+                        <div style="display: flex; align-items: center; margin-bottom: 15px;">
+                            <div style="flex: 1; height: 15px; background-color: #e9ecef; border-radius: 5px; overflow: hidden;">
+                                <div style="height: 100%; background-color: {% if learned_words_count >= fsrs_adjustment_threshold|default(50) %}#28a745{% else %}#007bff{% endif %}; width: {{ (learned_words_count / fsrs_adjustment_threshold|default(50) * 100)|round|int if fsrs_adjustment_threshold|default(50) > 0 else 0 }}%"></div>
+                            </div>
+                            <span style="margin-left: 15px; font-weight: bold; font-size: 16px;">{{ learned_words_count }}/{{ fsrs_adjustment_threshold|default(50) }}</span>
+                        </div>
+                        
+                        <p style="margin-top: 10px; color: #666;">
+                            FSRS算法需要至少{{ fsrs_adjustment_threshold|default(50) }}个已学习的单词数据才能优化参数。
+                            {% if learned_words_count >= fsrs_adjustment_threshold|default(50) %}
+                            <span style="color: #28a745; font-weight: bold;">您已达到阈值，系统将自动优化参数以适应您的记忆模式。</span>
+                            {% else %}
+                            继续学习和复习更多单词，以便系统能够更好地适应您的记忆模式。还需要{{ fsrs_adjustment_threshold|default(50) - learned_words_count }}个单词。
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+                
+                <div class="analytics-card">
+                    <div class="analytics-header">
+                        <h3 class="analytics-title">记忆曲线</h3>
+                    </div>
+                    
+                    <div class="chart-container">
+                        <canvas id="retentionChart"></canvas>
+                    </div>
+                </div>
+                
+                <div class="analytics-card">
+                    <div class="analytics-header">
+                        <h3 class="analytics-title">复习历史</h3>
+                    </div>
+                    
+                    <div class="chart-container">
+                        <canvas id="reviewHistoryChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 工作量预测标签页 -->
+            <div id="workload" class="tab-content">
+                <div class="analytics-card">
+                    <div class="analytics-header">
+                        <h3 class="analytics-title">未来30天工作量预测</h3>
+                    </div>
+                    
+                    <div class="chart-container">
+                        <canvas id="workloadChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 算法参数标签页 -->
+            <div id="parameters" class="tab-content">
+                <div class="analytics-card">
+                    <div class="analytics-header">
+                        <h3 class="analytics-title">FSRS算法参数</h3>
+                    </div>
+                    
+                    <p>当前使用的FSRS算法参数如下：</p>
+                    
+                    <table class="params-table">
+                        <thead>
+                            <tr>
+                                <th>参数描述</th>
+                                <th>当前值</th>
+                                <th>默认值</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for param in params %}
+                            <tr>
+                                <td>{{ param.description }}</td>
+                                <td>{{ "%.3f"|format(param.value) }}</td>
+                                <td>{{ "%.3f"|format(param.default) }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    
+                    <p>这些参数会根据您的学习数据自动优化，以提供更个性化的学习体验。</p>
+                </div>
+            </div>
+        </div>
+    </main>
+    
+    <footer>
+        <p>FSRS Demo - IGCSE Mathematics 0580</p>
+    </footer>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // 标签页切换
+            const tabs = document.querySelectorAll('.tab');
+            const tabContents = document.querySelectorAll('.tab-content');
+            
+            tabs.forEach(tab => {
+                tab.addEventListener('click', function() {
+                    const tabId = this.getAttribute('data-tab');
+                    
+                    // 移除所有活动标签
+                    tabs.forEach(t => t.classList.remove('active'));
+                    tabContents.forEach(c => c.classList.remove('active'));
+                    
+                    // 激活当前标签
+                    this.classList.add('active');
+                    document.getElementById(tabId).classList.add('active');
+                });
+            });
+            
+            // 记忆曲线图表
+            try {
+                const retentionCtx = document.getElementById('retentionChart').getContext('2d');
+                new Chart(retentionCtx, {
+                    type: 'line',
+                    data: {
+                        labels: {{ retention_days|default([])|tojson }},
+                        datasets: [{
+                            label: '记忆保留率',
+                            data: {{ retention_rates|default([])|tojson }},
+                            borderColor: '#4CAF50',
+                            backgroundColor: 'rgba(76, 175, 80, 0.1)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                max: 1,
+                                ticks: {
+                                    callback: function(value) {
+                                        return (value * 100) + '%';
+                                    }
+                                }
+                            },
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: '天数'
+                                }
+                            }
+                        }
+                    }
+                });
+            } catch (e) {
+                console.error('记忆曲线图表初始化失败', e);
+            }
+            
+            // 复习历史图表
+            try {
+                const reviewHistoryCtx = document.getElementById('reviewHistoryChart').getContext('2d');
+                new Chart(reviewHistoryCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: {{ review_history.dates|default([])|tojson }},
+                        datasets: [{
+                            label: '复习数量',
+                            data: {{ review_history.counts|default([])|tojson }},
+                            backgroundColor: '#2196F3',
+                            borderWidth: 0
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        }
+                    }
+                });
+            } catch (e) {
+                console.error('复习历史图表初始化失败', e);
+            }
+            
+            // 工作量预测图表
+            try {
+                const workloadCtx = document.getElementById('workloadChart').getContext('2d');
+                new Chart(workloadCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: {{ workload.dates|default([])|tojson }},
+                        datasets: [{
+                            label: '预计复习卡片数',
+                            data: {{ workload.counts|default([])|tojson }},
+                            backgroundColor: '#4CAF50',
+                            borderWidth: 0
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        }
+                    }
+                });
+            } catch (e) {
+                console.error('工作量预测图表初始化失败', e);
+            }
+        });
+    </script>
+</body>
+</html> 

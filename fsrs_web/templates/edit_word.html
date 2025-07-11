@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>编辑单词 - IGCSE Mathematics 0580</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .form-container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+
+        .form-group textarea {
+            height: 80px;
+            resize: vertical;
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 30px;
+        }
+
+        .btn {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            text-decoration: none;
+            display: inline-block;
+            text-align: center;
+            transition: background-color 0.3s;
+        }
+
+        .btn-primary {
+            background-color: #3498db;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: #2980b9;
+        }
+
+        .btn-secondary {
+            background-color: #95a5a6;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background-color: #7f8c8d;
+        }
+
+        .btn-danger {
+            background-color: #e74c3c;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background-color: #c0392b;
+        }
+
+        .alert {
+            padding: 10px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+            display: none;
+        }
+
+        .alert-success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert-error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            color: #666;
+        }
+
+        .delete-section {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 2px solid #eee;
+        }
+
+        .delete-warning {
+            background-color: #fff3cd;
+            color: #856404;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>编辑单词</h1>
+            <p class="subtitle">编辑 {{ card.unit_id.upper() }} 中的单词</p>
+        </header>
+
+        <main>
+            <div class="form-container">
+                <div id="alertMessage" class="alert"></div>
+                
+                <form id="editWordForm">
+                    <div class="form-group">
+                        <label for="word">单词 *</label>
+                        <input type="text" id="word" name="word" required value="{{ word }}" placeholder="请输入单词">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="pos">词性</label>
+                        <input type="text" id="pos" name="pos" value="{{ pos }}" placeholder="如：n., v., adj., adv.">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="chinese">中文释义</label>
+                        <textarea id="chinese" name="chinese" placeholder="请输入中文释义">{{ chinese }}</textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="english">英文释义</label>
+                        <textarea id="english" name="english" placeholder="请输入英文释义">{{ english }}</textarea>
+                    </div>
+
+                    <div class="loading" id="loadingMessage">
+                        正在保存单词...
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">保存修改</button>
+                        <a href="{{ url_for('unit', unit_id=card.unit_id) }}" class="btn btn-secondary">取消</a>
+                    </div>
+                </form>
+
+                <div class="delete-section">
+                    <div class="delete-warning">
+                        ⚠️ 危险操作：删除单词将永久移除该单词及其所有学习记录，此操作无法撤销。
+                    </div>
+                    <button id="deleteButton" class="btn btn-danger">删除此单词</button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        document.getElementById('editWordForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = {
+                word: document.getElementById('word').value.trim(),
+                pos: document.getElementById('pos').value.trim(),
+                chinese: document.getElementById('chinese').value.trim(),
+                english: document.getElementById('english').value.trim()
+            };
+
+            if (!formData.word) {
+                showAlert('单词不能为空', 'error');
+                return;
+            }
+
+            // 显示加载状态
+            document.getElementById('loadingMessage').style.display = 'block';
+            document.querySelector('button[type="submit"]').disabled = true;
+
+            fetch(`/edit_word/{{ card.id }}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(formData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('loadingMessage').style.display = 'none';
+                document.querySelector('button[type="submit"]').disabled = false;
+
+                if (data.status === 'success') {
+                    showAlert(data.message, 'success');
+                    // 2秒后跳转回单元页面
+                    setTimeout(() => {
+                        window.location.href = `{{ url_for('unit', unit_id=card.unit_id) }}`;
+                    }, 2000);
+                } else {
+                    showAlert(data.message, 'error');
+                }
+            })
+            .catch(error => {
+                document.getElementById('loadingMessage').style.display = 'none';
+                document.querySelector('button[type="submit"]').disabled = false;
+                showAlert('更新单词时发生错误，请重试', 'error');
+                console.error('Error:', error);
+            });
+        });
+
+        document.getElementById('deleteButton').addEventListener('click', function() {
+            const word = document.getElementById('word').value.trim() || '{{ word }}';
+            const confirmDelete = confirm(`确定要删除单词 "${word}" 吗？此操作无法撤销！`);
+            
+            if (confirmDelete) {
+                document.getElementById('deleteButton').disabled = true;
+                document.getElementById('deleteButton').textContent = '删除中...';
+
+                fetch(`/delete_word/{{ card.id }}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        showAlert(data.message, 'success');
+                        // 2秒后跳转回单元页面
+                        setTimeout(() => {
+                            window.location.href = `{{ url_for('unit', unit_id=card.unit_id) }}`;
+                        }, 2000);
+                    } else {
+                        showAlert(data.message, 'error');
+                        document.getElementById('deleteButton').disabled = false;
+                        document.getElementById('deleteButton').textContent = '删除此单词';
+                    }
+                })
+                .catch(error => {
+                    showAlert('删除单词时发生错误，请重试', 'error');
+                    document.getElementById('deleteButton').disabled = false;
+                    document.getElementById('deleteButton').textContent = '删除此单词';
+                    console.error('Error:', error);
+                });
+            }
+        });
+
+        function showAlert(message, type) {
+            const alertElement = document.getElementById('alertMessage');
+            alertElement.textContent = message;
+            alertElement.className = `alert alert-${type}`;
+            alertElement.style.display = 'block';
+            
+            // 3秒后自动隐藏错误消息
+            if (type === 'error') {
+                setTimeout(() => {
+                    alertElement.style.display = 'none';
+                }, 3000);
+            }
+        }
+    </script>
+</body>
+</html> 

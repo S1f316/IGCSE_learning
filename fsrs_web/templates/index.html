@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+
+{% block title %}IGCSE Mathematics 0580{% endblock %}
+
+{% block styles %}
+<style>
+    .reset-button {
+        display: block;
+        margin: 20px auto;
+        padding: 10px 15px;
+        background-color: #dc3545;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-weight: bold;
+    }
+    
+    .reset-button:hover {
+        background-color: #c82333;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<header>
+    <h1>IGCSE Mathematics 0580</h1>
+    <p>基于FSRS算法的自适应学习系统</p>
+</header>
+
+<main>
+    <div class="card">
+        <div class="options">
+            <a href="{{ url_for('learn') }}" class="option">
+                <div class="option-icon">📚</div>
+                <h3>学习新内容</h3>
+                <p>浏览和学习课程的各个单元</p>
+            </a>
+            <a href="{{ url_for('review') }}" class="option">
+                <div class="option-icon">🔄</div>
+                <h3>复习内容</h3>
+                <p>根据FSRS算法安排的复习计划</p>
+                {% if due_cards_count > 0 %}
+                <div class="badge">{{ due_cards_count }}</div>
+                {% endif %}
+            </a>
+            <a href="{{ url_for('word_stats') }}" class="option">
+                <div class="option-icon">📊</div>
+                <h3>单词状态</h3>
+                <p>查看已学习单词的记忆状态和曲线</p>
+            </a>
+            <a href="{{ url_for('daily_plan') }}" class="option">
+                <div class="option-icon">📅</div>
+                <h3>今日计划</h3>
+                <p>查看今日待完成的学习任务</p>
+                {% if total_tasks > 0 %}
+                <div class="badge">{{ completed_tasks }}/{{ total_tasks }}</div>
+                {% endif %}
+            </a>
+            <a href="{{ url_for('fsrs_analytics') }}" class="option">
+                <div class="option-icon">📈</div>
+                <h3>FSRS分析</h3>
+                <p>查看学习数据分析和记忆曲线</p>
+            </a>
+        </div>
+        
+        <button id="resetButton" class="reset-button">重置今日进度</button>
+    </div>
+    
+    <div class="card info-card">
+        <h2>关于FSRS算法</h2>
+        <p>FSRS (Free Spaced Repetition Scheduler) 是一种先进的间隔重复算法，它通过分析你的记忆模式，为每张卡片计算最佳的复习时间。</p>
+        <p>每次复习后，你需要根据记忆情况进行评分：</p>
+        <ul>
+            <li><strong>重来 (Again)</strong>：完全不记得</li>
+            <li><strong>困难 (Hard)</strong>：记得，但花了很长时间</li>
+            <li><strong>良好 (Good)</strong>：记得，但需要一些思考</li>
+            <li><strong>简单 (Easy)</strong>：立即记起，毫不费力</li>
+        </ul>
+        <p>系统会根据你的评分调整每张卡片的复习间隔，使你的学习效率最大化。</p>
+    </div>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const resetButton = document.getElementById('resetButton');
+        
+        resetButton.addEventListener('click', function() {
+            if (confirm('确定要重置今日学习和复习进度吗？这将清除所有今日的学习记录。')) {
+                fetch('/reset_session', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({})
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        alert('进度已重置');
+                        window.location.reload();
+                    } else {
+                        alert('重置失败，请稍后再试');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('重置失败，请稍后再试');
+                });
+            }
+        });
+    });
+</script>
+{% endblock %} 

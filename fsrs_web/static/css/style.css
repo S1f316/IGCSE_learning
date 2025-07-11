@@ -1,0 +1,279 @@
+/* 基础样式 */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+body {
+    background-color: #f7f9fc;
+    color: #333;
+    line-height: 1.6;
+    padding: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+/* 头部样式 */
+header {
+    text-align: center;
+    margin-bottom: 2rem;
+    padding: 1rem 0;
+}
+
+header h1 {
+    font-size: 2.5rem;
+    color: #2c3e50;
+    margin-bottom: 0.5rem;
+}
+
+header p {
+    color: #7f8c8d;
+    font-size: 1.1rem;
+}
+
+/* 主体内容 */
+main {
+    margin-bottom: 3rem;
+}
+
+/* 卡片样式 */
+.card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05);
+    padding: 2rem;
+    text-align: center;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    margin-bottom: 2rem;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.1);
+}
+
+.card h2 {
+    font-size: 1.8rem;
+    margin-bottom: 1.5rem;
+    color: #2c3e50;
+}
+
+/* 信息卡片 */
+.info-card {
+    text-align: left;
+    padding: 1.5rem 2rem;
+}
+
+.info-card p {
+    margin-bottom: 1rem;
+}
+
+.info-card ul {
+    margin: 1rem 0 1rem 1.5rem;
+}
+
+.info-card li {
+    margin-bottom: 0.5rem;
+}
+
+/* 选项样式 */
+.options {
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+    flex-wrap: wrap;
+}
+
+.option {
+    flex: 1;
+    min-width: 200px;
+    max-width: 300px;
+    padding: 1.5rem;
+    background-color: #f8f9fa;
+    border-radius: 10px;
+    text-decoration: none;
+    color: inherit;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.option:hover {
+    background-color: #e9ecef;
+    transform: translateY(-5px);
+}
+
+.option-icon {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+}
+
+.option h3 {
+    margin-bottom: 0.5rem;
+    color: #2c3e50;
+}
+
+.option p {
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+/* 徽章 */
+.badge {
+    position: absolute;
+    top: -10px;
+    right: -10px;
+    background-color: #e74c3c;
+    color: white;
+    width: 25px;
+    height: 25px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 0.8rem;
+}
+
+/* 按钮样式 */
+.btn {
+    display: inline-block;
+    padding: 0.8rem 1.8rem;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    border: none;
+}
+
+.btn-primary {
+    background-color: #3498db;
+    color: white;
+}
+
+.btn-secondary {
+    background-color: #6c757d;
+    color: white;
+}
+
+.btn:hover {
+    opacity: 0.9;
+}
+
+/* 页脚样式 */
+footer {
+    text-align: center;
+    padding: 1rem 0;
+    color: #7f8c8d;
+    font-size: 0.9rem;
+}
+
+/* 词汇卡片样式 */
+.word-card {
+    text-align: left;
+    padding: 15px;
+}
+
+.word-card .word {
+    font-size: 24px;
+    color: #2c3e50;
+    margin-bottom: 8px;
+}
+
+.word-card .part-of-speech {
+    font-style: italic;
+    color: #7f8c8d;
+    margin-bottom: 12px;
+}
+
+.word-card .definition {
+    margin: 10px 0;
+    line-height: 1.5;
+}
+
+.word-card .chinese {
+    font-size: 18px;
+    color: #e74c3c;
+    font-weight: 500;
+}
+
+.word-card .english {
+    font-size: 16px;
+    color: #3498db;
+    border-top: 1px solid #eee;
+    padding-top: 10px;
+    margin-top: 10px;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+    .options {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .option {
+        width: 100%;
+    }
+    
+    header h1 {
+        font-size: 2rem;
+    }
+    
+    .card {
+        padding: 1.5rem;
+    }
+} 
+
+/* 热力图自定义样式 */
+.heatmap-scroll-container {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch; /* 为iOS设备提供平滑滚动 */
+    scrollbar-width: thin; /* Firefox */
+    padding: 10px 0;
+}
+
+.heatmap-scroll-container::-webkit-scrollbar {
+    height: 8px;
+}
+
+.heatmap-scroll-container::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.heatmap-scroll-container::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+.heatmap-scroll-container::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* 增加方块大小 */
+.cal-heatmap-container .graph-rect {
+    stroke: white;
+    stroke-width: 1px;
+}
+
+/* 今日方块加粗边框 */
+.cal-heatmap-container rect.today-highlight {
+    stroke: #ff5722 !important;
+    stroke-width: 2px !important;
+}
+
+/* 确保热力图容器有足够的宽度 */
+#cal-heatmap {
+    min-width: 100%;
+}
+
+/* 调整热力图尺寸 */
+.cal-heatmap-container .graph-rect {
+    rx: 2px;
+    ry: 2px;
+} 

@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ unit_name }} - IGCSE Mathematics 0580</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .cards-container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+            cursor: pointer;
+            position: relative; /* 为感叹号定位 */
+        }
+        
+        .card h3 {
+            margin-top: 0;
+            color: #333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .card-front {
+            font-size: 18px;
+            margin-bottom: 15px;
+            padding: 10px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+        }
+        
+        .card-back {
+            display: none;
+            padding: 10px;
+            background-color: #f0f8ff;
+            border-radius: 5px;
+            margin-top: 10px;
+            border-left: 3px solid #4CAF50;
+        }
+        
+        .card-footer {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+            font-size: 14px;
+            color: #777;
+        }
+        
+        .unit-header {
+            margin: 20px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .unit-info {
+            flex: 1;
+        }
+
+        .unit-actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .navigation {
+            display: flex;
+            justify-content: space-between;
+            margin: 20px 0;
+        }
+        
+        .stats {
+            margin-top: 5px;
+            font-size: 14px;
+            color: #666;
+        }
+
+        /* 感叹号样式 */
+        .exclamation {
+            position: absolute;
+            top: 10px;
+            right: 50px; /* 调整位置为编辑按钮留空间 */
+            width: 24px;
+            height: 24px;
+            background-color: #ff0000;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        /* 已查看卡片样式 */
+        .card.viewed {
+            border-left: 4px solid #4CAF50;
+        }
+
+        /* 编辑按钮样式 */
+        .edit-button {
+            font-style: italic;
+            text-decoration: underline;
+            color: #3498db;
+            font-size: 14px;
+            cursor: pointer;
+            margin-left: auto;
+            transition: color 0.3s;
+        }
+
+        .edit-button:hover {
+            color: #2980b9;
+        }
+
+        /* 添加新单词按钮 */
+        .add-word-btn {
+            background-color: #27ae60;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            transition: background-color 0.3s;
+        }
+
+        .add-word-btn:hover {
+            background-color: #229954;
+        }
+
+        /* 空状态样式 */
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+
+        .empty-state h3 {
+            color: #666;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>IGCSE Mathematics 0580 - {{ unit_name }}</h1>
+    </header>
+    
+    <main>
+        <div class="navigation">
+            <a href="{{ url_for('learn') }}" class="btn btn-secondary">← 返回单元列表</a>
+            <a href="{{ url_for('review') }}" class="btn btn-primary">进入复习 →</a>
+        </div>
+        
+        <div class="unit-header">
+            <div class="unit-info">
+                <h2>{{ unit_name }} - 学习卡片</h2>
+                <p>点击卡片可以查看答案。学习完成后，点击卡片会移除红色感叹号标记，表示已学习。只有已学习的卡片才会出现在复习队列中。</p>
+            </div>
+            <div class="unit-actions">
+                <a href="{{ url_for('add_word', unit_id=unit_id) }}" class="add-word-btn">+ 添加新单词</a>
+            </div>
+        </div>
+        
+        <div class="cards-container">
+            {% if cards %}
+                {% for card in cards %}
+                <div class="card {% if card.is_viewed %}viewed{% endif %}" id="card-{{ card.id }}" data-id="{{ card.id }}">
+                    {% if not card.is_viewed %}
+                    <div class="exclamation" id="exclamation-{{ card.id }}">!</div>
+                    {% endif %}
+                    <h3>
+                        <span>卡片 {{ loop.index }}</span>
+                    </h3>
+                    <div class="card-front">{{ card.front|safe }}</div>
+                    <div class="card-back" id="back-{{ card.id }}">{{ card.back|safe }}</div>
+                    <div class="card-footer">
+                        <span>创建于: {{ card.created_at.strftime('%Y-%m-%d') }}</span>
+                        <a href="{{ url_for('edit_word', card_id=card.id) }}" class="edit-button" onclick="event.stopPropagation();">编辑</a>
+                    </div>
+                    {% if card.memory_state %}
+                    <div class="stats">
+                        <span>稳定性: {{ card.memory_state.stability|round(2) }}</span> |
+                        <span>难度: {{ card.memory_state.difficulty|round(2) }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-state">
+                    <h3>此单元还没有学习卡片</h3>
+                    <p>点击下面的按钮开始添加您的第一个单词</p>
+                    <a href="{{ url_for('add_word', unit_id=unit_id) }}" class="add-word-btn">+ 添加第一个单词</a>
+                </div>
+            {% endif %}
+        </div>
+        
+        <div class="navigation">
+            <a href="{{ url_for('learn') }}" class="btn btn-secondary">← 返回单元列表</a>
+            <a href="{{ url_for('review') }}" class="btn btn-primary">进入复习 →</a>
+        </div>
+    </main>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const cards = document.querySelectorAll('.card');
+            
+            cards.forEach(card => {
+                card.addEventListener('click', function(e) {
+                    // 如果点击的是编辑按钮，不处理卡片点击事件
+                    if (e.target.classList.contains('edit-button')) {
+                        return;
+                    }
+                    
+                    const id = this.dataset.id;
+                    const back = document.getElementById(`back-${id}`);
+                    const exclamation = document.getElementById(`exclamation-${id}`);
+                    
+                    // 显示/隐藏答案
+                    if (back.style.display === 'block') {
+                        back.style.display = 'none';
+                    } else {
+                        back.style.display = 'block';
+                        
+                        // 如果有感叹号，则标记为已查看
+                        if (exclamation) {
+                            markAsViewed(id);
+                        }
+                    }
+                });
+            });
+        });
+
+        // 标记为已查看
+        function markAsViewed(cardId) {
+            // 发送请求到服务器
+            fetch(`/mark_as_viewed/${cardId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({})
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    // 更新UI
+                    const exclamation = document.getElementById(`exclamation-${cardId}`);
+                    if (exclamation) {
+                        exclamation.style.display = 'none';
+                    }
+                    
+                    const card = document.getElementById(`card-${cardId}`);
+                    if (card) {
+                        card.classList.add('viewed');
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+        }
+    </script>
+</body>
+</html> 
