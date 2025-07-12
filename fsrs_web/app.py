@@ -19,6 +19,9 @@ import uuid
 # 添加项目根目录到Python路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+# 导入配置
+from config import DATA_DIR, CARD_STATES_FILE, USERS_FILE, SECRET_KEY, DEBUG
+
 # 尝试导入FSRS模块
 try:
     # 首先尝试从models目录导入
@@ -198,6 +201,8 @@ except ImportError:
                 return card
 
 app = Flask(__name__)
+app.secret_key = SECRET_KEY
+app.config['DEBUG'] = DEBUG
 app.secret_key = 'fsrs_demo_secret_key'  # 用于session
 
 # 用户数据存储
@@ -476,22 +481,12 @@ possible_paths = [
     os.path.dirname(__file__)  # fsrs_web目录
 ]
 
-# 默认路径
-storage_path = os.path.join(os.path.dirname(__file__), 'data')
-if not os.path.exists(storage_path):
-    os.makedirs(storage_path)
-storage_file = os.path.join(storage_path, 'card_states.pkl')
+# 使用配置中的数据路径
+storage_file = CARD_STATES_FILE
 
-# 尝试找到现有的数据文件
-for path in possible_paths:
-    if not os.path.exists(path):
-        continue
-    
-    temp_file = os.path.join(path, 'card_states.pkl')
-    if os.path.exists(temp_file):
-        storage_file = temp_file
-        print(f"找到数据文件: {storage_file}")
-        break
+# 确保数据目录存在
+os.makedirs(os.path.dirname(storage_file), exist_ok=True)
+print(f"找到数据文件: {storage_file}")
 
 print(f"使用数据文件路径: {storage_file}")
 
