@@ -7,8 +7,17 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.9
+      - key: USE_DATABASE
+        value: "true"
+      - key: RENDER
+        value: "true"
+      - key: DATABASE_URL
+        value: "postgresql://chusheng_db_5djd_user:CEVrhJEIfditwICZpC4xfRwW0hXxFzJo@dpg-d1ov19ur433s73cpu850-a.singapore-postgres.render.com/chusheng_db_5djd"
+      - key: SECRET_KEY
+        generateValue: true
     healthCheckPath: /
-    disk:
-      name: data
-      mountPath: /data
-      sizeGB: 1 
+    # 不再需要数据磁盘，因为使用数据库存储
+    # disk:
+    #   name: data
+    #   mountPath: /data
+    #   sizeGB: 1 

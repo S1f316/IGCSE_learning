@@ -6,291 +6,294 @@
 """
 
 import os
+import json
 import pickle
-import uuid
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional
+from datetime import datetime
+from dataclasses import asdict
+import sys
 
-from .fsrs import Card, MemoryState, ReviewLog
+# 添加项目根目录到路径
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
+# 导入配置
+from fsrs_web.config import CARD_STATES_FILE, USERS_FILE, USE_DATABASE
 
-class CardStorage:
-    """卡片数据存储类"""
+# 数据库操作
+database = None
+if USE_DATABASE:
+    try:
+        from fsrs_web.models.database import (
+            initialize_db, get_db_session, 
+            User, SystemCard, UserCardState, UserFSRSParam,
+            migrate_from_files
+        )
+        database = True
+        # 确保数据库表已创建
+        initialize_db()
+    except Exception as e:
+        print(f"数据库初始化失败: {e}")
+        database = False
+
+class StorageAdapter:
+    """存储适配器，处理文件存储和数据库存储"""
     
-    def __init__(self, storage_file: str = 'card_states.pkl'):
-        """初始化存储
-        
-        Args:
-            storage_file: 数据文件路径
-        """
-        self.storage_file = storage_file
-        self.cards: Dict[str, Card] = {}
-        self.load()
-    
-    def load(self) -> None:
-        """从文件加载卡片数据"""
-        if os.path.exists(self.storage_file):
+    @staticmethod
+    def load_users():
+        """加载用户数据"""
+        if USE_DATABASE and database:
+            # 使用数据库存储
+            session = get_db_session()
             try:
-                with open(self.storage_file, 'rb') as f:
-                    self.cards = pickle.load(f)
-                print(f"已加载 {len(self.cards)} 张卡片")
+                users = {}
+                for user in session.query(User).all():
+                    users[user.username] = {
+                        'password': user.password,
+                        'email': user.email,
+                        'created_at': user.created_at
+                    }
+                return users
             except Exception as e:
-                print(f"加载卡片数据失败: {e}")
-                # 如果加载失败，创建备份并使用空数据
-                if os.path.exists(self.storage_file):
-                    backup_file = f"{self.storage_file}.bak"
-                    try:
-                        os.rename(self.storage_file, backup_file)
-                        print(f"已创建备份: {backup_file}")
-                    except:
-                        pass
-                self.cards = {}
+                print(f"从数据库加载用户失败: {e}")
+                return {}
+            finally:
+                session.close()
         else:
-            self.cards = {}
+            # 使用文件存储
+            if os.path.exists(USERS_FILE):
+                try:
+                    with open(USERS_FILE, 'r', encoding='utf-8') as f:
+                        return json.load(f)
+                except Exception as e:
+                    print(f"加载用户数据失败: {e}")
+            return {}
     
-    def save(self) -> None:
-        """保存卡片数据到文件"""
+    @staticmethod
+    def save_users(users):
+        """保存用户数据"""
+        if USE_DATABASE and database:
+            # 使用数据库存储
+            session = get_db_session()
+            try:
+                # 删除所有现有用户
+                existing_users = {user.username: user for user in session.query(User).all()}
+                
+                # 更新或添加用户
+                for username, user_data in users.items():
+                    if username in existing_users:
+                        # 更新现有用户
+                        existing_user = existing_users[username]
+                        existing_user.password = user_data.get('password', '')
+                        existing_user.email = user_data.get('email', '')
+                    else:
+                        # 添加新用户
+                        new_user = User(
+                            username=username,
+                            password=user_data.get('password', ''),
+                            email=user_data.get('email', ''),
+                            created_at=user_data.get('created_at', datetime.now())
+                        )
+                        session.add(new_user)
+                
+                # 删除不在新数据中的用户
+                for username in list(existing_users.keys()):
+                    if username not in users:
+                        session.delete(existing_users[username])
+                        
+                session.commit()
+            except Exception as e:
+                session.rollback()
+                print(f"保存用户数据到数据库失败: {e}")
+            finally:
+                session.close()
+        else:
+            # 使用文件存储
+            try:
+                os.makedirs(os.path.dirname(USERS_FILE), exist_ok=True)
+                with open(USERS_FILE, 'w', encoding='utf-8') as f:
+                    json.dump(users, f)
+            except Exception as e:
+                print(f"保存用户数据失败: {e}")
+    
+    @staticmethod
+    def load_cards(system_cards_class, card_state_class, user_fsrs_params_class):
+        """加载卡片数据"""
+        if USE_DATABASE and database:
+            # 使用数据库存储
+            session = get_db_session()
+            try:
+                # 加载系统卡片
+                system_cards = {}
+                for card in session.query(SystemCard).all():
+                    system_card = system_cards_class(
+                        id=card.id,
+                        unit_id=card.unit_id,
+                        front=card.front,
+                        back=card.back,
+                        created_at=card.created_at,
+                        due_date=card.created_at  # 设置默认值
+                    )
+                    system_cards[card.id] = system_card
+                
+                # 加载用户卡片状态
+                user_card_states = {}
+                for user_state in session.query(UserCardState).all():
+                    username = user_state.username
+                    if username not in user_card_states:
+                        user_card_states[username] = {}
+                    
+                    # 创建记忆状态
+                    memory_state = None
+                    if user_state.memory_stability is not None and user_state.memory_difficulty is not None:
+                        memory_state_class = getattr(sys.modules[system_cards_class.__module__], 'MemoryState')
+                        memory_state = memory_state_class(
+                            stability=user_state.memory_stability,
+                            difficulty=user_state.memory_difficulty
+                        )
+                    
+                    # 获取复习记录
+                    review_logs = []
+                    if user_state.review_logs:
+                        review_log_class = getattr(sys.modules[system_cards_class.__module__], 'ReviewLog')
+                        logs_data = json.loads(user_state.review_logs)
+                        for log_data in logs_data:
+                            # 将字符串时间戳转换为datetime对象
+                            if isinstance(log_data['timestamp'], str):
+                                timestamp = datetime.fromisoformat(log_data['timestamp'])
+                            else:
+                                timestamp = log_data['timestamp']
+                            
+                            log = review_log_class(
+                                timestamp=timestamp,
+                                rating=log_data['rating'],
+                                elapsed_days=log_data['elapsed_days'],
+                                scheduled_days=log_data['scheduled_days']
+                            )
+                            review_logs.append(log)
+                    
+                    # 创建用户卡片状态
+                    card_state = card_state_class(
+                        card_id=user_state.card_id or '',
+                        is_viewed=user_state.is_viewed,
+                        memory_state=memory_state,
+                        review_logs=review_logs,
+                        due_date=user_state.due_date,
+                        learning_factor=user_state.learning_factor,
+                        is_user_card=user_state.is_user_card
+                    )
+                    
+                    # 设置用户卡片数据
+                    if user_state.is_user_card and user_state.user_card_data:
+                        card_state.user_card_data = user_state.get_user_card_data()
+                    
+                    user_card_states[username][user_state.card_id or user_state.id] = card_state
+                
+                # 加载用户FSRS参数
+                user_fsrs_params = {}
+                for user_param in session.query(UserFSRSParam).all():
+                    params = user_param.get_params()
+                    user_fsrs_params[user_param.username] = user_fsrs_params_class(
+                        params=params,
+                        last_updated=user_param.last_updated,
+                        optimization_count=user_param.optimization_count
+                    )
+                
+                return system_cards, user_card_states, user_fsrs_params
+            except Exception as e:
+                print(f"从数据库加载卡片数据失败: {e}")
+                import traceback
+                traceback.print_exc()
+                return {}, {}, {}
+            finally:
+                session.close()
+        else:
+            # 使用文件存储
+            system_cards = {}
+            user_card_states = {}
+            user_fsrs_params = {}
+            
+            if os.path.exists(CARD_STATES_FILE):
+                try:
+                    with open(CARD_STATES_FILE, 'rb') as f:
+                        all_data = pickle.load(f)
+                        
+                        # 检查数据格式
+                        if isinstance(all_data, dict):
+                            # 检查是否是新格式(包含system_cards和user_card_states)
+                            if 'system_cards' in all_data and 'user_card_states' in all_data:
+                                system_cards = all_data['system_cards']
+                                user_card_states = all_data['user_card_states']
+                                # 加载用户FSRS参数
+                                if 'user_fsrs_params' in all_data:
+                                    user_fsrs_params = all_data['user_fsrs_params']
+                except Exception as e:
+                    print(f"加载卡片数据失败: {e}")
+                    import traceback
+                    traceback.print_exc()
+            
+            return system_cards, user_card_states, user_fsrs_params
+    
+    @staticmethod
+    def save_cards(system_cards, user_card_states, user_fsrs_params):
+        """保存卡片数据"""
+        if USE_DATABASE and database:
+            # 使用数据库存储
+            # 这里我们做的不是每次保存所有数据，而是应该单独更新修改的数据
+            # 但为了简化迁移过程，我们可以先实现一个完全覆盖的版本
+            try:
+                # 加载用户数据
+                users = StorageAdapter.load_users()
+                # 迁移所有数据
+                success = migrate_from_files(system_cards, user_card_states, user_fsrs_params, users)
+                if success:
+                    print("成功将数据保存到数据库")
+                else:
+                    print("保存数据到数据库失败")
+            except Exception as e:
+                print(f"保存卡片数据到数据库失败: {e}")
+                import traceback
+                traceback.print_exc()
+        else:
+            # 使用文件存储
+            try:
+                # 确保目录存在
+                os.makedirs(os.path.dirname(CARD_STATES_FILE), exist_ok=True)
+                
+                # 将数据打包为新格式
+                all_data = {
+                    'system_cards': system_cards,
+                    'user_card_states': user_card_states,
+                    'user_fsrs_params': user_fsrs_params
+                }
+                
+                with open(CARD_STATES_FILE, 'wb') as f:
+                    pickle.dump(all_data, f)
+            except Exception as e:
+                print(f"保存卡片数据失败: {e}")
+                import traceback
+                traceback.print_exc()
+
+    @staticmethod
+    def migrate_data():
+        """将数据从文件迁移到数据库"""
+        if not USE_DATABASE or not database:
+            print("数据库未启用，无法迁移数据")
+            return False
+        
+        # 检查文件是否存在
+        if not os.path.exists(CARD_STATES_FILE) or not os.path.exists(USERS_FILE):
+            print("找不到数据文件，无法迁移数据")
+            return False
+        
         try:
-            with open(self.storage_file, 'wb') as f:
-                pickle.dump(self.cards, f)
-            print(f"已保存 {len(self.cards)} 张卡片")
+            # 加载文件数据
+            from fsrs_web.app import system_cards, user_card_states, user_fsrs_params
+            with open(USERS_FILE, 'r', encoding='utf-8') as f:
+                users_data = json.load(f)
+            
+            # 迁移到数据库
+            return migrate_from_files(system_cards, user_card_states, user_fsrs_params, users_data)
         except Exception as e:
-            print(f"保存卡片数据失败: {e}")
-    
-    def get_card(self, card_id: str) -> Optional[Card]:
-        """获取卡片
-        
-        Args:
-            card_id: 卡片ID
-            
-        Returns:
-            卡片对象，如果不存在则返回None
-        """
-        return self.cards.get(card_id)
-    
-    def add_card(self, card: Card) -> Card:
-        """添加卡片
-        
-        Args:
-            card: 卡片对象
-            
-        Returns:
-            添加的卡片对象
-        """
-        self.cards[card.id] = card
-        self.save()
-        return card
-    
-    def update_card(self, card: Card) -> Card:
-        """更新卡片
-        
-        Args:
-            card: 卡片对象
-            
-        Returns:
-            更新后的卡片对象
-        """
-        self.cards[card.id] = card
-        self.save()
-        return card
-    
-    def delete_card(self, card_id: str) -> bool:
-        """删除卡片
-        
-        Args:
-            card_id: 卡片ID
-            
-        Returns:
-            是否删除成功
-        """
-        if card_id in self.cards:
-            del self.cards[card_id]
-            self.save()
-            return True
-        return False
-    
-    def get_all_cards(self) -> List[Card]:
-        """获取所有卡片
-        
-        Returns:
-            所有卡片的列表
-        """
-        return list(self.cards.values())
-    
-    def get_cards_by_unit(self, unit_id: str) -> List[Card]:
-        """获取指定单元的所有卡片
-        
-        Args:
-            unit_id: 单元ID
-            
-        Returns:
-            指定单元的卡片列表
-        """
-        return [card for card in self.cards.values() if card.unit_id == unit_id]
-    
-    def get_due_cards(self, current_time: Optional[datetime] = None) -> List[Card]:
-        """获取当前需要复习的卡片
-        
-        Args:
-            current_time: 当前时间，如果为None则使用当前时间
-            
-        Returns:
-            需要复习的卡片列表
-        """
-        actual_time = current_time if current_time is not None else datetime.now()
-        return [card for card in self.cards.values() if card.due_date <= actual_time]
-    
-    def import_vocabulary_from_excel(self, excel_path: str, unit_id: str = 'unit1') -> List[Card]:
-        """从Excel导入词汇
-        
-        Args:
-            excel_path: Excel文件路径
-            unit_id: 单元ID
-            
-        Returns:
-            导入的卡片列表
-        """
-        try:
-            import pandas as pd
-            
-            # 读取Excel文件
-            df = pd.read_excel(excel_path)
-            
-            # 跳过第一行，并获取B, C, D, E列 (索引1, 2, 3, 4)
-            if len(df.columns) < 5:
-                print("Excel文件格式不正确，列数不足")
-                return []
-            
-            # 提取所需列
-            word_df = df.iloc[:, 1:5]  # 选择B, C, D, E列
-            
-            created_cards = []
-            now = datetime.now()
-            
-            # 删除该单元的所有现有卡片
-            existing_cards = self.get_cards_by_unit(unit_id)
-            for card in existing_cards:
-                self.delete_card(card.id)
-            
-            # 创建新卡片
-            for _, row in word_df.iterrows():
-                word = row.iloc[0]  # 单词 (B列)
-                pos = row.iloc[1]   # 词性 (C列)
-                chinese = row.iloc[2]  # 中文翻译 (D列)
-                english = row.iloc[3]  # 英文定义 (E列)
-                
-                # 跳过空行
-                if pd.isna(word) or str(word).strip() == '':
-                    continue
-                
-                # 创建卡片正面内容
-                front_content = f"""<div class="word-card">
-    <h3 class="word">{word}</h3>
-    <div class="part-of-speech">{pos if not pd.isna(pos) else ''}</div>
-</div>"""
-                
-                # 创建卡片背面内容
-                back_content = f"""<div class="word-card">
-    <h3 class="word">{word}</h3>
-    <div class="part-of-speech">{pos if not pd.isna(pos) else ''}</div>
-    <div class="definition chinese">{chinese if not pd.isna(chinese) else ''}</div>
-    <div class="definition english">{english if not pd.isna(english) else ''}</div>
-</div>"""
-                
-                card_id = f"{unit_id}_{str(uuid.uuid4())[:8]}"
-                card = Card(
-                    id=card_id,
-                    unit_id=unit_id,
-                    front=front_content,
-                    back=back_content,
-                    created_at=now,
-                    due_date=now,  # 新卡片立即可以学习
-                    memory_state=None,
-                    review_logs=[]
-                )
-                self.add_card(card)
-                created_cards.append(card)
-            
-            print(f"已从Excel导入 {len(created_cards)} 张卡片到单元 {unit_id}")
-            return created_cards
-        
-        except Exception as e:
-            print(f"导入Excel数据失败: {e}")
+            print(f"数据迁移失败: {e}")
             import traceback
             traceback.print_exc()
-            return []
-    
-    def create_sample_cards_for_unit(self, unit_id: str, num_cards: int = 5) -> List[Card]:
-        """为指定单元创建示例卡片
-        
-        Args:
-            unit_id: 单元ID
-            num_cards: 要创建的卡片数量
-            
-        Returns:
-            创建的卡片列表
-        """
-        # Unit 1 (Number) 的示例内容
-        unit1_samples = [
-            {
-                "front": "计算 12 × 8 ÷ 4 + 6",
-                "back": "30。计算顺序：先乘除，后加减。12 × 8 = 96, 96 ÷ 4 = 24, 24 + 6 = 30"
-            },
-            {
-                "front": "将 3.75 转换为分数",
-                "back": "3.75 = 3 + 0.75 = 3 + 3/4 = 15/4"
-            },
-            {
-                "front": "25% 的 80 是多少?",
-                "back": "20。计算方法：80 × 0.25 = 20"
-            },
-            {
-                "front": "计算 2^4 × 2^3",
-                "back": "2^7 = 128。指数相加：2^(4+3) = 2^7 = 128"
-            },
-            {
-                "front": "将 0.00057 写成标准形式",
-                "back": "5.7 × 10^-4"
-            },
-            {
-                "front": "如果比例是 3:5，当第一个数是 18 时，第二个数是多少?",
-                "back": "30。解法：18 ÷ 3 × 5 = 30"
-            },
-            {
-                "front": "找出数列 2, 5, 8, 11, ... 的第 10 项",
-                "back": "29。这是公差为 3 的等差数列，通项公式为 a_n = 2 + (n-1)*3。第 10 项为 2 + 9*3 = 29"
-            },
-        ]
-        
-        # 其他单元的默认样本
-        default_samples = [
-            {
-                "front": f"{unit_id} 示例卡片 {i}",
-                "back": f"这是 {unit_id} 的示例答案 {i}"
-            }
-            for i in range(1, num_cards + 1)
-        ]
-        
-        # 根据单元选择不同的示例
-        samples = unit1_samples if unit_id == 'unit1' else default_samples
-        samples = samples[:num_cards]  # 限制卡片数量
-        
-        created_cards = []
-        now = datetime.now()
-        
-        for i, sample in enumerate(samples):
-            card_id = f"{unit_id}_{str(uuid.uuid4())[:8]}"
-            card = Card(
-                id=card_id,
-                unit_id=unit_id,
-                front=sample["front"],
-                back=sample["back"],
-                created_at=now,
-                due_date=now,  # 新卡片立即可以学习
-                memory_state=None,
-                review_logs=[]
-            )
-            self.add_card(card)
-            created_cards.append(card)
-        
-        return created_cards 
+            return False 

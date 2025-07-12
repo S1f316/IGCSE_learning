@@ -20,7 +20,7 @@ import uuid
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # 导入配置
-from config import DATA_DIR, CARD_STATES_FILE, USERS_FILE, SECRET_KEY, DEBUG
+from config import DATA_DIR, CARD_STATES_FILE, USERS_FILE, SECRET_KEY, DEBUG, USE_DATABASE
 
 # 尝试导入FSRS模块
 try:
@@ -213,18 +213,24 @@ os.makedirs(os.path.dirname(users_file), exist_ok=True)
 
 # 加载用户数据
 def load_users():
-    if os.path.exists(users_file):
-        try:
-            with open(users_file, 'r') as f:
-                return json.load(f)
-        except:
-            return {}
-    return {}
+    if StorageAdapter is not None:
+        return StorageAdapter.load_users()
+    else:
+        if os.path.exists(users_file):
+            try:
+                with open(users_file, 'r') as f:
+                    return json.load(f)
+            except:
+                return {}
+        return {}
 
 # 保存用户数据
 def save_users(users):
-    with open(users_file, 'w') as f:
-        json.dump(users, f, indent=4)
+    if StorageAdapter is not None:
+        StorageAdapter.save_users(users)
+    else:
+        with open(users_file, 'w') as f:
+            json.dump(users, f, indent=4)
 
 # 密码哈希函数
 def hash_password(password):
@@ -490,6 +496,16 @@ print(f"找到数据文件: {storage_file}")
 
 print(f"使用数据文件路径: {storage_file}")
 
+# 导入存储适配器
+try:
+    from models.storage import StorageAdapter
+except ImportError:
+    try:
+        from fsrs_web.models.storage import StorageAdapter
+    except ImportError:
+        print("无法导入StorageAdapter，将使用默认文件存储")
+        StorageAdapter = None
+
 # 卡片数据结构改进
 # 系统将维护两种卡片：
 # 1. 系统基础卡片(system_cards): 所有用户共享的基础单词库
@@ -532,135 +548,171 @@ user_fsrs_params = {}  # 格式: {username: UserFSRSParams}
 def load_cards():
     """加载卡片数据"""
     global system_cards, user_card_states, user_fsrs_params
-    if os.path.exists(storage_file):
-        try:
-            with open(storage_file, 'rb') as f:
-                all_data = pickle.load(f)
-                
-                # 检查数据格式
-                if isinstance(all_data, dict):
-                    # 检查是否是新格式(包含system_cards和user_card_states)
-                    if 'system_cards' in all_data and 'user_card_states' in all_data:
-                        system_cards = all_data['system_cards']
-                        user_card_states = all_data['user_card_states']
-                        # 加载用户FSRS参数
-                        if 'user_fsrs_params' in all_data:
-                            user_fsrs_params = all_data['user_fsrs_params']
-                        print("已加载新格式数据")
-                    # 检查是否是中间格式(用户分离的字典)
-                    elif any(isinstance(v, dict) for v in all_data.values()):
-                        print("检测到中间格式数据，正在转换为新格式...")
-                        # 将所有卡片转换为系统卡片
-                        system_cards = {}
-                        user_card_states = {}
-                        
-                        for username, cards_dict in all_data.items():
-                            # 为每个用户创建卡片状态字典
-                            user_card_states[username] = {}
+    
+    # 如果可用，使用存储适配器
+    if StorageAdapter is not None:
+        system_cards, user_card_states, user_fsrs_params = StorageAdapter.load_cards(
+            system_cards_class=Card, 
+            card_state_class=CardState, 
+            user_fsrs_params_class=UserFSRSParams
+        )
+        print(f"已加载 {len(system_cards)} 张系统卡片")
+        print(f"已加载 {len(user_card_states)} 个用户的卡片状态")
+        print(f"已加载 {len(user_fsrs_params)} 个用户的FSRS参数")
+        
+        # 打印每个用户的卡片数量
+        for username, states in user_card_states.items():
+            print(f"用户 {username} 有 {len(states)} 个卡片状态")
+            
+            # 统计每个单元的卡片数量
+            unit_counts = defaultdict(int)
+            for card_id, state in states.items():
+                if state.is_user_card and state.user_card_data:
+                    unit_counts[state.user_card_data.get('unit_id', 'unknown')] += 1
+                elif card_id in system_cards:
+                    unit_counts[system_cards[card_id].unit_id] += 1
+            
+            # 打印单元统计
+            if unit_counts:
+                print(f"用户 {username} 各单元卡片数量:")
+                for unit_id, count in unit_counts.items():
+                    print(f"  {unit_id}: {count} 张卡片")
+    else:
+        # 使用旧的文件存储方式
+        if os.path.exists(storage_file):
+            try:
+                with open(storage_file, 'rb') as f:
+                    all_data = pickle.load(f)
+                    
+                    # 检查数据格式
+                    if isinstance(all_data, dict):
+                        # 检查是否是新格式(包含system_cards和user_card_states)
+                        if 'system_cards' in all_data and 'user_card_states' in all_data:
+                            system_cards = all_data['system_cards']
+                            user_card_states = all_data['user_card_states']
+                            # 加载用户FSRS参数
+                            if 'user_fsrs_params' in all_data:
+                                user_fsrs_params = all_data['user_fsrs_params']
+                            print("已加载新格式数据")
+                        # 检查是否是中间格式(用户分离的字典)
+                        elif any(isinstance(v, dict) for v in all_data.values()):
+                            print("检测到中间格式数据，正在转换为新格式...")
+                            # 将所有卡片转换为系统卡片
+                            system_cards = {}
+                            user_card_states = {}
                             
-                            for card_id, card in cards_dict.items():
-                                # 将卡片添加到系统卡片
-                                if card_id not in system_cards:
-                                    # 创建一个不包含用户特定状态的卡片副本
-                                    system_card = Card(
-                                        id=card.id,
-                                        unit_id=card.unit_id,
-                                        front=card.front,
-                                        back=card.back,
-                                        created_at=card.created_at
-                                    )
-                                    system_cards[card_id] = system_card
-                                
-                                # 创建用户卡片状态
-                                card_state = CardState(
-                                    card_id=card_id,
-                                    is_viewed=card.is_viewed if hasattr(card, 'is_viewed') else False,
-                                    memory_state=card.memory_state if hasattr(card, 'memory_state') else None,
-                                    review_logs=card.review_logs if hasattr(card, 'review_logs') else [],
-                                    due_date=card.due_date if hasattr(card, 'due_date') else card.created_at,
-                                    learning_factor=card.learning_factor if hasattr(card, 'learning_factor') else 1.0
-                                )
-                                user_card_states[username][card_id] = card_state
-                    else:
-                        # 旧格式，转换为新格式
-                        print("检测到旧格式卡片数据，正在转换为新格式...")
-                        system_cards = all_data
-                        
-                        # 获取所有用户
-                        users = load_users()
-                        if users:
-                            # 为每个用户创建卡片状态
-                            for username in users:
+                            for username, cards_dict in all_data.items():
+                                # 为每个用户创建卡片状态字典
                                 user_card_states[username] = {}
+                                
+                                for card_id, card in cards_dict.items():
+                                    # 将卡片添加到系统卡片
+                                    if card_id not in system_cards:
+                                        # 创建一个不包含用户特定状态的卡片副本
+                                        system_card = Card(
+                                            id=card.id,
+                                            unit_id=card.unit_id,
+                                            front=card.front,
+                                            back=card.back,
+                                            created_at=card.created_at
+                                        )
+                                        system_cards[card_id] = system_card
+                                    
+                                    # 创建用户卡片状态
+                                    card_state = CardState(
+                                        card_id=card_id,
+                                        is_viewed=card.is_viewed if hasattr(card, 'is_viewed') else False,
+                                        memory_state=card.memory_state if hasattr(card, 'memory_state') else None,
+                                        review_logs=card.review_logs if hasattr(card, 'review_logs') else [],
+                                        due_date=card.due_date if hasattr(card, 'due_date') else card.created_at,
+                                        learning_factor=card.learning_factor if hasattr(card, 'learning_factor') else 1.0
+                                    )
+                                    user_card_states[username][card_id] = card_state
+                        else:
+                            # 旧格式，转换为新格式
+                            print("检测到旧格式卡片数据，正在转换为新格式...")
+                            system_cards = all_data
+                            
+                            # 获取所有用户
+                            users = load_users()
+                            if users:
+                                # 为每个用户创建卡片状态
+                                for username in users:
+                                    user_card_states[username] = {}
+                                    for card_id, card in system_cards.items():
+                                        # 创建默认卡片状态
+                                        user_card_states[username][card_id] = CardState(
+                                            card_id=card_id,
+                                            is_viewed=False,
+                                            due_date=card.created_at
+                                        )
+                            else:
+                                # 如果没有用户，创建默认用户
+                                user_card_states['default'] = {}
                                 for card_id, card in system_cards.items():
-                                    # 创建默认卡片状态
-                                    user_card_states[username][card_id] = CardState(
+                                    user_card_states['default'][card_id] = CardState(
                                         card_id=card_id,
                                         is_viewed=False,
                                         due_date=card.created_at
                                     )
-                        else:
-                            # 如果没有用户，创建默认用户
-                            user_card_states['default'] = {}
-                            for card_id, card in system_cards.items():
-                                user_card_states['default'][card_id] = CardState(
-                                    card_id=card_id,
-                                    is_viewed=False,
-                                    due_date=card.created_at
-                                )
+                    
+                print(f"已加载 {len(system_cards)} 张系统卡片")
+                print(f"已加载 {len(user_card_states)} 个用户的卡片状态")
+                print(f"已加载 {len(user_fsrs_params)} 个用户的FSRS参数")
                 
-            print(f"已加载 {len(system_cards)} 张系统卡片")
-            print(f"已加载 {len(user_card_states)} 个用户的卡片状态")
-            print(f"已加载 {len(user_fsrs_params)} 个用户的FSRS参数")
-            
-            # 打印每个用户的卡片数量
-            for username, states in user_card_states.items():
-                print(f"用户 {username} 有 {len(states)} 个卡片状态")
+                # 打印每个用户的卡片数量
+                for username, states in user_card_states.items():
+                    print(f"用户 {username} 有 {len(states)} 个卡片状态")
+                    
+                    # 统计每个单元的卡片数量
+                    unit_counts = defaultdict(int)
+                    for card_id, state in states.items():
+                        if state.is_user_card and state.user_card_data:
+                            unit_counts[state.user_card_data.get('unit_id', 'unknown')] += 1
+                        elif card_id in system_cards:
+                            unit_counts[system_cards[card_id].unit_id] += 1
+                    
+                    # 打印单元统计
+                    if unit_counts:
+                        print(f"用户 {username} 各单元卡片数量:")
+                        for unit_id, count in unit_counts.items():
+                            print(f"  {unit_id}: {count} 张卡片")
                 
-                # 统计每个单元的卡片数量
-                unit_counts = defaultdict(int)
-                for card_id, state in states.items():
-                    if state.is_user_card and state.user_card_data:
-                        unit_counts[state.user_card_data.get('unit_id', 'unknown')] += 1
-                    elif card_id in system_cards:
-                        unit_counts[system_cards[card_id].unit_id] += 1
-                
-                # 打印单元统计
-                if unit_counts:
-                    print(f"用户 {username} 各单元卡片数量:")
-                    for unit_id, count in unit_counts.items():
-                        print(f"  {unit_id}: {count} 张卡片")
-            
-        except Exception as e:
-            print(f"加载卡片数据失败: {e}")
-            import traceback
-            traceback.print_exc()
+            except Exception as e:
+                print(f"加载卡片数据失败: {e}")
+                import traceback
+                traceback.print_exc()
+                system_cards = {}
+                user_card_states = {}
+                user_fsrs_params = {}
+        else:
             system_cards = {}
             user_card_states = {}
             user_fsrs_params = {}
-    else:
-        system_cards = {}
-        user_card_states = {}
-        user_fsrs_params = {}
 
 def save_cards():
     """保存卡片数据"""
-    try:
-        # 确保目录存在
-        os.makedirs(os.path.dirname(storage_file), exist_ok=True)
-        
-        # 将数据打包为新格式
-        all_data = {
-            'system_cards': system_cards,
-            'user_card_states': user_card_states,
-            'user_fsrs_params': user_fsrs_params
-        }
-        
-        with open(storage_file, 'wb') as f:
-            pickle.dump(all_data, f)
-        print(f"已保存 {len(system_cards)} 张系统卡片和 {len(user_card_states)} 个用户的卡片状态")
-    except Exception as e:
-        print(f"保存卡片数据失败: {e}")
+    if StorageAdapter is not None:
+        # 使用存储适配器保存数据
+        StorageAdapter.save_cards(system_cards, user_card_states, user_fsrs_params)
+    else:
+        # 使用旧的文件存储方式
+        try:
+            # 确保目录存在
+            os.makedirs(os.path.dirname(storage_file), exist_ok=True)
+            
+            # 将数据打包为新格式
+            all_data = {
+                'system_cards': system_cards,
+                'user_card_states': user_card_states,
+                'user_fsrs_params': user_fsrs_params
+            }
+            
+            with open(storage_file, 'wb') as f:
+                pickle.dump(all_data, f)
+            print(f"已保存 {len(system_cards)} 张系统卡片和 {len(user_card_states)} 个用户的卡片状态")
+        except Exception as e:
+            print(f"保存卡片数据失败: {e}")
 
 def get_user_cards():
     """获取当前用户可见的所有卡片"""
@@ -1901,6 +1953,19 @@ def delete_word(card_id):
             return jsonify({'status': 'error', 'message': '卡片不存在'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': f'删除卡片时出错: {str(e)}'})
+
+# 应用初始化时执行数据迁移
+if USE_DATABASE and StorageAdapter is not None:
+    @app.before_first_request
+    def initialize_database():
+        """第一次请求前初始化数据库"""
+        # 尝试进行数据迁移
+        if os.path.exists(storage_file) or os.path.exists(users_file):
+            print("正在尝试将数据从文件迁移到数据库...")
+            if StorageAdapter.migrate_data():
+                print("数据迁移完成！")
+            else:
+                print("数据迁移失败，将继续使用文件存储。")
 
 # 在文件末尾添加端口绑定代码
 if __name__ == '__main__':
