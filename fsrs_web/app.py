@@ -2056,10 +2056,21 @@ if USE_DATABASE and StorageAdapter is not None:
 
             sess = get_db_session()
             try:
-                if sess.query(SystemCard).count() == 0:
+                total_cards = sess.query(SystemCard).count()
+                needs_overwrite = False
+                if total_cards == 0:
+                    needs_overwrite = True
+                else:
+                    # 检测旧版本数据(unit_id 没有前缀的情况)
+                    sample = sess.query(SystemCard).first()
+                    if sample and not str(sample.unit_id).lower().startswith("unit"):
+                        print("检测到旧版本系统卡片(unit_id 无前缀)，将执行覆盖导入…")
+                        needs_overwrite = True
+
+                if needs_overwrite:
                     if Path(excel_path).exists():
                         added = import_from_excel(excel_path, overwrite=True)
-                        print(f"首次部署：已从 Excel 导入 {added} 张系统卡片")
+                        print(f"系统卡片初始化/覆盖完成，导入 {added} 张。")
                         if added:
                             # 导入后刷新内存中的 system_cards / user_card_states
                             try:

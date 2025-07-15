@@ -85,7 +85,8 @@ def import_from_excel(excel_path: Union[str, Path] = DEFAULT_EXCEL_PATH, overwri
         cards_to_add: list[SystemCard] = []
 
         for i, row in enumerate(df.itertuples(index=False), start=1):
-            unit_id = str(getattr(row, "Unit")).strip()
+            raw_unit = str(getattr(row, "Unit")).strip()
+            unit_id = f"unit{raw_unit}" if not str(raw_unit).lower().startswith("unit") else raw_unit
             word = str(getattr(row, "Word")).strip()
             pos = str(getattr(row, "Part_of_speech")).strip()
             zh = str(getattr(row, "Chinese_definition")).strip()
