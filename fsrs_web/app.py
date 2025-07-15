@@ -2050,7 +2050,7 @@ if USE_DATABASE and StorageAdapter is not None:
         try:
             from pathlib import Path
             from import_word_list import import_from_excel, DEFAULT_EXCEL_PATH
-            from models.database import get_db_session, SystemCard
+            from models.database import get_db_session, SystemCard, UserCardState
 
             excel_path = os.environ.get("WORD_LIST_PATH", str(DEFAULT_EXCEL_PATH))
 
@@ -2079,7 +2079,58 @@ if USE_DATABASE and StorageAdapter is not None:
                             except Exception as refresh_err:
                                 print(f"刷新内存系统卡片失败: {refresh_err}")
                     else:
-                        print(f"首次部署：未找到 Excel 文件 {excel_path} ，跳过初始化导入")
+                        print(f"首次部署：未找到 Excel 文件 {excel_path} ，尝试直接修复数据库中的 unit 前缀…")
+
+                        try:
+                            # 找出所有 unit_id 不以 'unit' 开头的系统卡片
+                            from sqlalchemy import not_  # 本地导入，避免循环依赖
+                            legacy_cards = sess.query(SystemCard).filter(not_(SystemCard.unit_id.ilike('unit%'))).all()
+                            updated_count = 0
+
+                            for card in legacy_cards:
+                                old_unit = str(card.unit_id).strip()
+                                new_unit = f"unit{old_unit}"
+
+                                # 根据旧 card_id 推算新 card_id（保持后缀不变）
+                                if card.id.startswith(f"{old_unit}_"):
+                                    suffix = card.id.split('_', 1)[1]
+                                    new_card_id = f"{new_unit}_{suffix}"
+                                else:
+                                    # 如果 card_id 格式异常，直接跳过，避免破坏数据
+                                    print(f"⚠️ 跳过无法解析 card_id 的旧卡片: {card.id}")
+                                    continue
+
+                                # 若目标 ID 已存在，说明之前迁移过，直接跳过
+                                if sess.get(SystemCard, new_card_id):
+                                    print(f"⚠️ 目标卡片已存在，跳过: {new_card_id}")
+                                    continue
+
+                                # 更新 SystemCard 主键及 unit_id
+                                setattr(card, 'unit_id', new_unit)
+                                setattr(card, 'id', new_card_id)
+
+                                # 同步更新所有关联的 UserCardState.card_id
+                                sess.query(UserCardState).filter_by(card_id=f"{old_unit}_{suffix}").update({
+                                    'card_id': new_card_id
+                                }, synchronize_session=False)
+
+                                updated_count += 1
+
+                            if updated_count:
+                                sess.commit()
+                                print(f"✅ 已修复 {updated_count} 张系统卡片的 unit 前缀")
+
+                                # 修复后刷新内存缓存
+                                try:
+                                    load_cards()
+                                    print("已刷新内存缓存的系统卡片数据")
+                                except Exception as refresh_err:
+                                    print(f"刷新内存系统卡片失败: {refresh_err}")
+                            else:
+                                print("ℹ️ 未检测到需要修复的旧版系统卡片")
+                        except Exception as fix_err:
+                            sess.rollback()
+                            print(f"❌ 修复 unit 前缀时出错: {fix_err}")
             finally:
                 sess.close()
         except Exception as imp_err:

@@ -17,7 +17,7 @@ os.environ.setdefault("USE_DATABASE", "true")
 from models.database import get_db_session, SystemCard
 
 # 获取要查看的单元ID
-unit_id = sys.argv[1] if len(sys.argv) > 1 else "1"
+unit_id = sys.argv[1] if len(sys.argv) > 1 else "unit1"
 
 session = get_db_session()
 try:
