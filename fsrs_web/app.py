@@ -286,14 +286,25 @@ def register():
             # 为新用户创建所有系统卡片的默认状态
             if USE_DATABASE and StorageAdapter is not None:
                 try:
-                    from models.database import get_db_session, SystemCard, UserCardState
+                    # 引入 User 以便在数据库中创建新用户记录
+                    from models.database import get_db_session, SystemCard, User, UserCardState
                     session_db = get_db_session()
                     try:
+                        # 如果用户已存在则跳过创建
+                        existing_user = session_db.query(User).filter_by(username=username).first()
+                        if not existing_user:
+                            # 创建数据库中的用户记录
+                            new_user = User(
+                                username=username,
+                                password=hash_password(password)
+                            )
+                            session_db.add(new_user)
+
                         # 获取所有系统卡片
-                        system_cards = session_db.query(SystemCard).all()
+                        db_system_cards = session_db.query(SystemCard).all()
                         
                         # 为新用户创建所有系统卡片的默认状态
-                        for card in system_cards:
+                        for card in db_system_cards:
                             user_state = UserCardState(
                                 username=username,
                                 card_id=card.id,
@@ -305,7 +316,7 @@ def register():
                             session_db.add(user_state)
                         
                         session_db.commit()
-                        print(f"为新用户 {username} 创建了 {len(system_cards)} 张系统卡片的默认状态")
+                        print(f"为新用户 {username} 创建了 {len(db_system_cards)} 张系统卡片的默认状态")
                     except Exception as e:
                         session_db.rollback()
                         print(f"为新用户创建卡片状态失败: {e}")
