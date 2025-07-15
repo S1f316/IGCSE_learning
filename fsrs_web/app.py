@@ -283,6 +283,54 @@ def register():
             # 保存用户数据
             save_users(users)
             
+            # 为新用户创建所有系统卡片的默认状态
+            if USE_DATABASE and StorageAdapter is not None:
+                try:
+                    from models.database import get_db_session, SystemCard, UserCardState
+                    session_db = get_db_session()
+                    try:
+                        # 获取所有系统卡片
+                        system_cards = session_db.query(SystemCard).all()
+                        
+                        # 为新用户创建所有系统卡片的默认状态
+                        for card in system_cards:
+                            user_state = UserCardState(
+                                username=username,
+                                card_id=card.id,
+                                is_viewed=False,
+                                due_date=card.created_at,
+                                learning_factor=1.0,
+                                is_user_card=False
+                            )
+                            session_db.add(user_state)
+                        
+                        session_db.commit()
+                        print(f"为新用户 {username} 创建了 {len(system_cards)} 张系统卡片的默认状态")
+                    except Exception as e:
+                        session_db.rollback()
+                        print(f"为新用户创建卡片状态失败: {e}")
+                    finally:
+                        session_db.close()
+                except Exception as e:
+                    print(f"导入数据库模块失败: {e}")
+            else:
+                # 文件存储模式：为新用户创建默认卡片状态
+                if username not in user_card_states:
+                    user_card_states[username] = {}
+                
+                # 为所有系统卡片创建默认状态
+                for card_id, card in system_cards.items():
+                    user_card_states[username][card_id] = CardState(
+                        card_id=card_id,
+                        is_viewed=False,
+                        due_date=card.created_at,
+                        learning_factor=1.0,
+                        is_user_card=False
+                    )
+                
+                save_cards()
+                print(f"为新用户 {username} 创建了 {len(system_cards)} 张系统卡片的默认状态")
+            
             # 自动登录
             session['logged_in'] = True
             session['username'] = username
@@ -1986,4 +2034,66 @@ if USE_DATABASE and StorageAdapter is not None:
 if __name__ == '__main__':
     # 获取环境变量中的端口，如果不存在则使用默认的5000
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=True) 
+    app.run(host='0.0.0.0', port=port, debug=True)
+
+def create_card_states_for_all_users(card_id, unit_id, front, back, created_at):
+    """为所有现有用户创建指定系统卡片的默认状态"""
+    if USE_DATABASE and StorageAdapter is not None:
+        try:
+            from models.database import get_db_session, User, UserCardState
+            session_db = get_db_session()
+            try:
+                # 获取所有用户
+                users = session_db.query(User).all()
+                
+                # 为每个用户创建该卡片的默认状态
+                for user in users:
+                    # 检查是否已存在
+                    existing = session_db.query(UserCardState).filter_by(
+                        username=user.username, 
+                        card_id=card_id
+                    ).first()
+                    
+                    if not existing:
+                        user_state = UserCardState(
+                            username=user.username,
+                            card_id=card_id,
+                            is_viewed=False,
+                            due_date=created_at,
+                            learning_factor=1.0,
+                            is_user_card=False
+                        )
+                        session_db.add(user_state)
+                
+                session_db.commit()
+                print(f"为 {len(users)} 个用户创建了卡片 {card_id} 的默认状态")
+                return True
+            except Exception as e:
+                session_db.rollback()
+                print(f"为用户创建卡片状态失败: {e}")
+                return False
+            finally:
+                session_db.close()
+        except Exception as e:
+            print(f"导入数据库模块失败: {e}")
+            return False
+    else:
+        # 文件存储模式
+        try:
+            # 为所有用户创建该卡片的默认状态
+            for username in user_card_states:
+                if card_id not in user_card_states[username]:
+                    user_card_states[username][card_id] = CardState(
+                        card_id=card_id,
+                        is_viewed=False,
+                        due_date=created_at,
+                        learning_factor=1.0,
+                        is_user_card=False
+                    )
+            
+            save_cards()
+            print(f"为 {len(user_card_states)} 个用户创建了卡片 {card_id} 的默认状态")
+            return True
+        except Exception as e:
+            print(f"为用户创建卡片状态失败: {e}")
+            return False
