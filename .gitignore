@@ -7,3 +7,5 @@ __pycache__/
 .env
 fsrs_web/data/*.pkl*
 fsrs_web/local.db
+fsrs_web/data/*.pkl
+fsrs_web/data/*.json
