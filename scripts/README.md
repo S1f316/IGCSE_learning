@@ -2,15 +2,7 @@
 
 ## 脚本列表
 
-### 1. migrate_old_pickle.py
-**用途**: 将本地文件数据迁移到数据库
-**用法**: 
-```bash
-python scripts/migrate_old_pickle.py
-```
-**说明**: 一次性脚本，将 `card_states.pkl` 和 `users.json` 中的数据迁移到 PostgreSQL 数据库
-
-### 2. add_system_card.py
+### 1. add_system_card.py
 **用途**: 添加新的系统卡片并为所有用户创建默认状态
 **用法**:
 ```bash
@@ -25,7 +17,7 @@ python scripts/add_system_card.py unit1 "新单词" "新单词的解释"
 - 为所有现有用户创建该卡片的默认状态
 - 新用户注册时会自动获得所有系统卡片
 
-### 3. fix_missing_card_states.py
+### 2. fix_missing_card_states.py
 **用途**: 为现有用户创建缺失的卡片状态
 **用法**:
 ```bash
@@ -41,6 +33,27 @@ export USE_DATABASE=true
 export DATABASE_URL="postgresql://..."
 ```
 
+## 在Render上使用
+
+由于Render部署的根目录是`fsrs_web`，因此在Render上使用这些脚本需要：
+
+1. 将脚本复制到`fsrs_web`目录下
+   ```bash
+   # 在本地执行
+   cp scripts/add_system_card.py fsrs_web/
+   cp scripts/fix_missing_card_states.py fsrs_web/
+   git add fsrs_web/*.py
+   git commit -m "Copy management scripts to fsrs_web directory"
+   git push
+   ```
+
+2. 在Render上执行脚本
+   ```bash
+   # 在Render控制台执行
+   cd fsrs_web
+   python add_system_card.py unit1 "新单词" "新单词的解释"
+   ```
+
 ## 使用场景
 
 ### 新用户注册
@@ -55,7 +68,7 @@ export DATABASE_URL="postgresql://..."
 ### 修复数据不一致
 如果发现某些用户缺少卡片状态：
 ```bash
-python scripts/fix_missing_card_states.py
+python fix_missing_card_states.py
 ```
 
 ## 注意事项
