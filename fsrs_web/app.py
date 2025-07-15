@@ -2079,7 +2079,7 @@ if USE_DATABASE and StorageAdapter is not None:
                             except Exception as refresh_err:
                                 print(f"刷新内存系统卡片失败: {refresh_err}")
                     else:
-                        print(f"首次部署：未找到 Excel 文件 {excel_path} ，尝试直接修复数据库中的 unit 前缀…")
+                        print(f"首次部署：未找到 Excel 文件 {excel_path} ，跳过初始化导入 (请确保提供词汇表 Excel 文件) ")
 
                         try:
                             # 找出所有 unit_id 不以 'unit' 开头的系统卡片

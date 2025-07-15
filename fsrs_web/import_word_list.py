@@ -15,6 +15,7 @@ import os
 import sys
 from pathlib import Path
 from typing import Union
+import re  # 用于解析 unit 编号
 from datetime import datetime
 
 import pandas as pd
@@ -84,9 +85,17 @@ def import_from_excel(excel_path: Union[str, Path] = DEFAULT_EXCEL_PATH, overwri
 
         cards_to_add: list[SystemCard] = []
 
+        # 辅助函数：统一单元编号，兼容 "1"、"Unit 1"、"unit1" 等写法
+        def normalize_unit(value: str) -> str:
+            s = str(value).strip().lower()
+            # 提取数字部分
+            match = re.search(r"(\d+)", s)
+            num = match.group(1) if match else s
+            return f"unit{num}"
+
         for i, row in enumerate(df.itertuples(index=False), start=1):
             raw_unit = str(getattr(row, "Unit")).strip()
-            unit_id = f"unit{raw_unit}" if not str(raw_unit).lower().startswith("unit") else raw_unit
+            unit_id = normalize_unit(raw_unit)
             word = str(getattr(row, "Word")).strip()
             pos = str(getattr(row, "Part_of_speech")).strip()
             zh = str(getattr(row, "Chinese_definition")).strip()
