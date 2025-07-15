@@ -3,4 +3,5 @@ FSRS记忆算法模型包
 """
 
 from .fsrs import FSRS, Card, MemoryState, ReviewLog
-from .storage import CardStorage 
+# 调整名称以保持向后兼容
+from .storage import StorageAdapter as CardStorage, StorageAdapter 
