@@ -317,6 +317,11 @@ def register():
                         
                         session_db.commit()
                         print(f"为新用户 {username} 创建了 {len(db_system_cards)} 张系统卡片的默认状态")
+                        # 刷新内存中的系统卡片与用户卡片状态，确保新注册用户立即可见
+                        try:
+                            load_cards()
+                        except Exception as refresh_err:
+                            print(f"刷新卡片数据失败: {refresh_err}")
                     except Exception as e:
                         session_db.rollback()
                         print(f"为新用户创建卡片状态失败: {e}")
