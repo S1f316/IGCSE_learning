@@ -2046,14 +2046,33 @@ if USE_DATABASE and StorageAdapter is not None:
             else:
                 print("数据迁移失败，将继续使用文件存储。")
 
-        # 无论是否迁移成功，尝试增量导入系统卡片（幂等）
+        # 仅在数据库无系统卡片时尝试初始化导入
         try:
-            from import_word_list import import_from_excel
-            added = import_from_excel(overwrite=False)
-            if added:
-                print(f"增量导入系统卡片完成，新增 {added} 张。")
+            from pathlib import Path
+            from import_word_list import import_from_excel, DEFAULT_EXCEL_PATH
+            from models.database import get_db_session, SystemCard
+
+            excel_path = os.environ.get("WORD_LIST_PATH", str(DEFAULT_EXCEL_PATH))
+
+            sess = get_db_session()
+            try:
+                if sess.query(SystemCard).count() == 0:
+                    if Path(excel_path).exists():
+                        added = import_from_excel(excel_path, overwrite=True)
+                        print(f"首次部署：已从 Excel 导入 {added} 张系统卡片")
+                        if added:
+                            # 导入后刷新内存中的 system_cards / user_card_states
+                            try:
+                                load_cards()
+                                print("已刷新内存缓存的系统卡片数据")
+                            except Exception as refresh_err:
+                                print(f"刷新内存系统卡片失败: {refresh_err}")
+                    else:
+                        print(f"首次部署：未找到 Excel 文件 {excel_path} ，跳过初始化导入")
+            finally:
+                sess.close()
         except Exception as imp_err:
-            print(f"启动时增量导入系统卡片失败: {imp_err}")
+            print(f"启动时初始化系统卡片失败: {imp_err}")
 
 # 在文件末尾添加端口绑定代码
 if __name__ == '__main__':
