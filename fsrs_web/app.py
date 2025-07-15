@@ -1956,7 +1956,7 @@ def delete_word(card_id):
 
 # 应用初始化时执行数据迁移
 if USE_DATABASE and StorageAdapter is not None:
-    @app.before_first_request
+    @app.before_serving  # type: ignore[attr-defined]
     def initialize_database():
         """第一次请求前初始化数据库"""
         # 尝试进行数据迁移
