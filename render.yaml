@@ -6,7 +6,7 @@ services:
     startCommand: cd fsrs_web && gunicorn -c gunicorn_config.py app:app
     envVars:
       - key: PYTHON_VERSION
-        value: 3.9
+        value: 3.9.18
       - key: USE_DATABASE
         value: "true"
       - key: RENDER
