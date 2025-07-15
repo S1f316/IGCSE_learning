@@ -1954,6 +1954,21 @@ def delete_word(card_id):
     except Exception as e:
         return jsonify({'status': 'error', 'message': f'删除卡片时出错: {str(e)}'})
 
+# ---------------------------------------------------------------------------
+# 兼容性处理：某些 Flask 版本(<3.2) 不提供 app.before_serving 装饰器。
+# 如果缺失，则动态创建一个简单的替代实现，立即调用目标函数，
+# 并返回原函数以保持装饰器语义（只在应用启动时执行一次）。
+# 这样既不影响 Render 上的高版本 Flask，也能让本地旧版本正常运行。
+
+if not hasattr(app, "before_serving"):
+    def _before_serving(func):  # type: ignore
+        # 直接在注册阶段执行一次初始化逻辑
+        func()
+        return func
+
+    # 动态挂载到 app 对象
+    setattr(app, "before_serving", _before_serving)
+
 # 应用初始化时执行数据迁移
 if USE_DATABASE and StorageAdapter is not None:
     @app.before_serving  # type: ignore[attr-defined]

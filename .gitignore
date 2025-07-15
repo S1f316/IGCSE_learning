@@ -2,3 +2,8 @@ anki_src/
 __pycache__/
 *.pyc
 .DS_Store
+
+# 本地环境与数据文件
+.env
+fsrs_web/data/*.pkl*
+fsrs_web/local.db
