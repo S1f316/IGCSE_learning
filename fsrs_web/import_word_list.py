@@ -22,7 +22,7 @@ import pandas as pd
 os.environ.setdefault("USE_DATABASE", "true")
 
 # 项目内导入（确保脚本可单独运行）
-from fsrs_web.models.database import (
+from models.database import (
     get_db_session,
     initialize_db,
     SystemCard,
@@ -49,12 +49,14 @@ if not excel_path.exists():
 
 print(f"📖 正在读取 Excel: {excel_path}")
 
+# 读取Excel文件，第一行为表头
 df = pd.read_excel(excel_path)
 
-# 要求至少包含这三个列名
-required_cols = {"Unit", "Word", "Meaning"}
-if not required_cols.issubset(set(df.columns)):
-    print("❌ Excel 文件必须包含列: Unit, Word, Meaning")
+# 检查必要的列是否存在
+required_cols = ["Unit", "Word", "Part_of_speech", "Chinese_definition", "English_definition"]
+if not all(col in df.columns for col in required_cols):
+    print(f"❌ Excel 文件必须包含这些列: {', '.join(required_cols)}")
+    print(f"实际列名: {', '.join(df.columns)}")
     sys.exit(1)
 
 session = get_db_session()
@@ -69,22 +71,37 @@ try:
     cards_to_add = []
 
     for i, row in enumerate(df.itertuples(index=False), start=1):
+        # 获取各列数据
         unit_id = str(getattr(row, "Unit")).strip()
-        front = str(getattr(row, "Word")).strip()
-        back = str(getattr(row, "Meaning")).strip()
+        word = str(getattr(row, "Word")).strip()
+        part_of_speech = str(getattr(row, "Part_of_speech")).strip()
+        chinese_meaning = str(getattr(row, "Chinese_definition")).strip()
+        english_meaning = str(getattr(row, "English_definition")).strip()
 
-        if not unit_id or not front or not back:
-            continue  # 跳过不完整行
+        # 跳过不完整行
+        if not unit_id or not word:
+            continue
 
-        # 生成唯一卡片 ID，例如 Unit1_001
+        # 组合释义：词性 + 中文释义 + 英文释义
+        meaning_parts = []
+        if part_of_speech:
+            meaning_parts.append(f"【{part_of_speech}】")
+        if chinese_meaning:
+            meaning_parts.append(chinese_meaning)
+        if english_meaning:
+            meaning_parts.append(f"({english_meaning})")
+        
+        meaning = " ".join(meaning_parts)
+
+        # 生成唯一卡片 ID，例如 1_001
         id_suffix = f"{i:03d}"
         card_id = f"{unit_id}_{id_suffix}"
 
         card = SystemCard(
             id=card_id,
             unit_id=unit_id,
-            front=front,
-            back=back,
+            front=word,
+            back=meaning,
             created_at=datetime.now(),
         )
         cards_to_add.append(card)
