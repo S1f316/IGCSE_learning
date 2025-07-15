@@ -113,6 +113,11 @@
             margin-top: 2px;
         }
         
+        .card-footer .footer-actions {
+            display: flex;
+            align-items: center;
+        }
+        
         .card-actions {
             display: flex;
             gap: 10px;
@@ -214,6 +219,21 @@
         .edit-button:hover {
             color: #2980b9;
         }
+        
+        /* 还原按钮样式 */
+        .restore-button {
+            font-style: italic;
+            text-decoration: underline;
+            color: #e74c3c;
+            font-size: 14px;
+            cursor: pointer;
+            margin-left: 10px;
+            transition: color 0.3s;
+        }
+
+        .restore-button:hover {
+            color: #c0392b;
+        }
 
         /* 添加新单词按钮 */
         .add-word-btn {
@@ -309,7 +329,10 @@
                             <div class="new-card">新卡片</div>
                             {% endif %}
                         </div>
-                        <a href="{{ url_for('edit_word', card_id=card.id) }}" class="edit-button" onclick="event.stopPropagation();">编辑</a>
+                        <div class="footer-actions">
+                            <a href="{{ url_for('edit_word', card_id=card.id) }}" class="edit-button" onclick="event.stopPropagation();">编辑</a>
+                            <a href="#" class="restore-button" onclick="event.stopPropagation(); restoreCard('{{ card.id }}')">还原</a>
+                        </div>
                     </div>
                     
                     <!-- 卡片操作按钮 -->
@@ -432,6 +455,32 @@
                 .catch(error => {
                     console.error('Error:', error);
                     alert('删除失败，请重试');
+                });
+            }
+        }
+        
+        // 还原卡片
+        function restoreCard(cardId) {
+            if (confirm('确定要还原这张卡片到原始状态吗？这将清除所有用户修改。')) {
+                fetch(`/restore_word/${cardId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({})
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        // 重新加载页面以显示还原后的内容
+                        location.reload();
+                    } else {
+                        alert('还原失败: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('还原失败，请重试');
                 });
             }
         }

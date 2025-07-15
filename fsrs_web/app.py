@@ -2018,6 +2018,47 @@ def delete_word(card_id):
     except Exception as e:
         return jsonify({'status': 'error', 'message': f'删除卡片时出错: {str(e)}'})
 
+@app.route('/restore_word/<card_id>', methods=['POST'])
+@login_required
+def restore_word(card_id):
+    """还原单词到原始状态"""
+    username = session.get('username')
+    if not username:
+        return jsonify({'status': 'error', 'message': '用户未登录'})
+    
+    try:
+        # 获取系统卡片
+        system_card = system_cards.get(card_id)
+        if not system_card:
+            return jsonify({'status': 'error', 'message': '系统卡片不存在'})
+        
+        # 检查用户卡片状态是否存在
+        if username in user_card_states and card_id in user_card_states[username]:
+            state = user_card_states[username][card_id]
+            
+            # 如果是用户自定义卡片，不能还原
+            if state.is_user_card:
+                return jsonify({'status': 'error', 'message': '用户自定义卡片不能还原'})
+            
+            # 还原卡片内容到系统原始状态
+            state.is_viewed = False  # 重置查看状态
+            state.memory_state = None  # 清除记忆状态
+            state.review_logs = []  # 清除复习记录
+            state.due_date = system_card.created_at  # 重置到期时间
+            state.learning_factor = 1.0  # 重置学习因子
+            
+            # 保存更改
+            save_cards()
+            
+            return jsonify({
+                'status': 'success',
+                'message': '单词已成功还原到原始状态'
+            })
+        else:
+            return jsonify({'status': 'error', 'message': '用户卡片状态不存在'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': f'还原卡片时出错: {str(e)}'})
+
 # ---------------------------------------------------------------------------
 # 兼容性处理：某些 Flask 版本(<3.2) 不提供 app.before_serving 装饰器。
 # 如果缺失，则动态创建一个简单的替代实现，立即调用目标函数，
