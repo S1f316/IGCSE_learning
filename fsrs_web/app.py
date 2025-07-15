@@ -2046,6 +2046,15 @@ if USE_DATABASE and StorageAdapter is not None:
             else:
                 print("数据迁移失败，将继续使用文件存储。")
 
+        # 无论是否迁移成功，尝试增量导入系统卡片（幂等）
+        try:
+            from import_word_list import import_from_excel
+            added = import_from_excel(overwrite=False)
+            if added:
+                print(f"增量导入系统卡片完成，新增 {added} 张。")
+        except Exception as imp_err:
+            print(f"启动时增量导入系统卡片失败: {imp_err}")
+
 # 在文件末尾添加端口绑定代码
 if __name__ == '__main__':
     # 获取环境变量中的端口，如果不存在则使用默认的5000
