@@ -1,0 +1,412 @@
+{% extends "base.html" %}
+
+{% block title %}个性化学习设置{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="text-center mb-0">个性化学习设置</h3>
+                    <p class="text-center text-muted mb-0">帮助我们为你制定最适合的学习计划</p>
+                </div>
+                <div class="card-body">
+                    <!-- 进度指示器 -->
+                    <div class="progress mb-4" style="height: 8px;">
+                        <div class="progress-bar" role="progressbar" style="width: 0%;" id="progress-bar"></div>
+                    </div>
+                    
+                    <form id="questionnaire-form" method="POST">
+                        <!-- 步骤1: 学习模式 -->
+                        <div class="question-step" id="step1">
+                            <h4 class="mb-3">1. 选择你的学习模式</h4>
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <div class="card h-100 learning-mode-card" data-mode="long_term">
+                                        <div class="card-body text-center">
+                                            <h5>长期学习</h5>
+                                            <p class="text-muted">注重长期记忆，适合无时间压力的学习</p>
+                                            <small class="text-info">推荐给：兴趣学习者</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <div class="card h-100 learning-mode-card" data-mode="medium">
+                                        <div class="card-body text-center">
+                                            <h5>中等模式</h5>
+                                            <p class="text-muted">平衡记忆效果和学习效率</p>
+                                            <small class="text-info">推荐给：大多数学习者</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <div class="card h-100 learning-mode-card" data-mode="exam_cram">
+                                        <div class="card-body text-center">
+                                            <h5>考前冲刺</h5>
+                                            <p class="text-muted">快速掌握，适合短期备考</p>
+                                            <small class="text-info">推荐给：考试备考者</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <input type="hidden" name="learning_mode" id="learning_mode" value="medium">
+                        </div>
+
+                        <!-- 步骤2: 考试时间 -->
+                        <div class="question-step" id="step2" style="display: none;">
+                            <h4 class="mb-3">2. 距离考试还有多长时间？</h4>
+                            <p class="text-muted mb-4">如果你没有特定考试，可以选择"无时间限制"</p>
+                            
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="radio" name="exam_type" id="no_exam" value="no_exam" checked>
+                                <label class="form-check-label" for="no_exam">
+                                    无时间限制（长期学习）
+                                </label>
+                            </div>
+                            
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="radio" name="exam_type" id="has_exam" value="has_exam">
+                                <label class="form-check-label" for="has_exam">
+                                    有特定考试时间
+                                </label>
+                            </div>
+                            
+                            <div id="exam_time_slider" style="display: none;">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <label for="exam_months" class="form-label">月数</label>
+                                        <input type="range" class="form-range" id="exam_months" name="exam_months" min="0" max="24" value="0">
+                                        <div class="text-center" id="exam_months_display">0 个月</div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="exam_days" class="form-label">天数</label>
+                                        <input type="range" class="form-range" id="exam_days" name="exam_days" min="0" max="30" value="0">
+                                        <div class="text-center" id="exam_days_display">0 天</div>
+                                    </div>
+                                </div>
+                                <div class="text-center mt-3">
+                                    <strong>总计：<span id="total_exam_time">0 天</span></strong>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 步骤3: 学习时间投入 -->
+                        <div class="question-step" id="step3" style="display: none;">
+                            <h4 class="mb-3">3. 你的学习时间投入</h4>
+                            
+                            <div class="mb-4">
+                                <label class="form-label">每日学习时长</label>
+                                <div class="row">
+                                    <div class="col-md-3 mb-2">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="daily_study_time" id="time_15" value="15min" checked>
+                                            <label class="form-check-label" for="time_15">15分钟</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3 mb-2">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="daily_study_time" id="time_30" value="30min">
+                                            <label class="form-check-label" for="time_30">30分钟</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3 mb-2">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="daily_study_time" id="time_45" value="45min">
+                                            <label class="form-check-label" for="time_45">45分钟</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3 mb-2">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="daily_study_time" id="time_60" value="60min+">
+                                            <label class="form-check-label" for="time_60">60分钟+</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-4">
+                                <label class="form-label">每周学习天数</label>
+                                <div class="row">
+                                    <div class="col-md-4 mb-2">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="weekly_study_days" id="days_3" value="3" checked>
+                                            <label class="form-check-label" for="days_3">3天</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4 mb-2">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="weekly_study_days" id="days_5" value="5">
+                                            <label class="form-check-label" for="days_5">5天</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4 mb-2">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="weekly_study_days" id="days_7" value="7">
+                                            <label class="form-check-label" for="days_7">7天</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 步骤4: 开始单元 -->
+                        <div class="question-step" id="step4" style="display: none;">
+                            <h4 class="mb-3">4. 选择开始学习的单元</h4>
+                            <p class="text-muted mb-4">你可以从任意单元开始学习，系统会根据你的选择调整学习计划</p>
+                            
+                            <div class="mb-3">
+                                <label for="start_unit" class="form-label">开始单元</label>
+                                <select class="form-select" id="start_unit" name="start_unit">
+                                    <option value="1">第1单元 - 基础词汇</option>
+                                    <option value="2">第2单元 - 日常用语</option>
+                                    <option value="3">第3单元 - 商务英语</option>
+                                    <option value="4">第4单元 - 学术词汇</option>
+                                    <option value="5">第5单元 - 高级表达</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- 步骤5: 预览和确认 -->
+                        <div class="question-step" id="step5" style="display: none;">
+                            <h4 class="mb-3">5. 确认你的学习设置</h4>
+                            
+                            <div class="card">
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <h6>学习模式</h6>
+                                            <p id="preview_learning_mode">中等模式</p>
+                                            
+                                            <h6>考试时间</h6>
+                                            <p id="preview_exam_time">无时间限制</p>
+                                            
+                                            <h6>学习时间</h6>
+                                            <p id="preview_study_time">每日15分钟，每周3天</p>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <h6>开始单元</h6>
+                                            <p id="preview_start_unit">第1单元</p>
+                                            
+                                            <h6>预期效果</h6>
+                                            <p id="preview_effect">平衡的记忆效果和学习效率</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="alert alert-info mt-3">
+                                <i class="fas fa-info-circle"></i>
+                                <strong>提示：</strong>你可以在个人资料页面随时修改这些设置。
+                            </div>
+                        </div>
+
+                        <!-- 导航按钮 -->
+                        <div class="d-flex justify-content-between mt-4">
+                            <button type="button" class="btn btn-secondary" id="prev-btn" style="display: none;">上一步</button>
+                            <button type="button" class="btn btn-primary" id="next-btn">下一步</button>
+                            <button type="submit" class="btn btn-success" id="submit-btn" style="display: none;">完成设置</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.learning-mode-card {
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+}
+
+.learning-mode-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.learning-mode-card.selected {
+    border-color: #007bff;
+    background-color: #f8f9fa;
+}
+
+.question-step {
+    animation: fadeIn 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.progress-bar {
+    transition: width 0.3s ease;
+}
+</style>
+
+<script>
+let currentStep = 1;
+const totalSteps = 5;
+
+// 初始化
+document.addEventListener('DOMContentLoaded', function() {
+    updateProgress();
+    setupEventListeners();
+});
+
+function setupEventListeners() {
+    // 学习模式选择
+    document.querySelectorAll('.learning-mode-card').forEach(card => {
+        card.addEventListener('click', function() {
+            document.querySelectorAll('.learning-mode-card').forEach(c => c.classList.remove('selected'));
+            this.classList.add('selected');
+            document.getElementById('learning_mode').value = this.dataset.mode;
+            updatePreview();
+        });
+    });
+
+    // 考试时间选择
+    document.getElementById('no_exam').addEventListener('change', function() {
+        document.getElementById('exam_time_slider').style.display = 'none';
+        updatePreview();
+    });
+
+    document.getElementById('has_exam').addEventListener('change', function() {
+        document.getElementById('exam_time_slider').style.display = 'block';
+        updatePreview();
+    });
+
+    // 滑块事件
+    document.getElementById('exam_months').addEventListener('input', updateExamTimeDisplay);
+    document.getElementById('exam_days').addEventListener('input', updateExamTimeDisplay);
+
+    // 学习时间选择
+    document.querySelectorAll('input[name="daily_study_time"], input[name="weekly_study_days"]').forEach(input => {
+        input.addEventListener('change', updatePreview);
+    });
+
+    // 开始单元选择
+    document.getElementById('start_unit').addEventListener('change', updatePreview);
+
+    // 导航按钮
+    document.getElementById('next-btn').addEventListener('click', nextStep);
+    document.getElementById('prev-btn').addEventListener('click', prevStep);
+}
+
+function updateProgress() {
+    const progress = (currentStep / totalSteps) * 100;
+    document.getElementById('progress-bar').style.width = progress + '%';
+}
+
+function nextStep() {
+    if (currentStep < totalSteps) {
+        document.getElementById('step' + currentStep).style.display = 'none';
+        currentStep++;
+        document.getElementById('step' + currentStep).style.display = 'block';
+        
+        if (currentStep === totalSteps) {
+            updatePreview();
+        }
+        
+        updateProgress();
+        updateNavigationButtons();
+    }
+}
+
+function prevStep() {
+    if (currentStep > 1) {
+        document.getElementById('step' + currentStep).style.display = 'none';
+        currentStep--;
+        document.getElementById('step' + currentStep).style.display = 'block';
+        
+        updateProgress();
+        updateNavigationButtons();
+    }
+}
+
+function updateNavigationButtons() {
+    const prevBtn = document.getElementById('prev-btn');
+    const nextBtn = document.getElementById('next-btn');
+    const submitBtn = document.getElementById('submit-btn');
+    
+    if (currentStep === 1) {
+        prevBtn.style.display = 'none';
+    } else {
+        prevBtn.style.display = 'block';
+    }
+    
+    if (currentStep === totalSteps) {
+        nextBtn.style.display = 'none';
+        submitBtn.style.display = 'block';
+    } else {
+        nextBtn.style.display = 'block';
+        submitBtn.style.display = 'none';
+    }
+}
+
+function updateExamTimeDisplay() {
+    const months = parseInt(document.getElementById('exam_months').value);
+    const days = parseInt(document.getElementById('exam_days').value);
+    
+    document.getElementById('exam_months_display').textContent = months + ' 个月';
+    document.getElementById('exam_days_display').textContent = days + ' 天';
+    
+    const totalDays = months * 30 + days;
+    document.getElementById('total_exam_time').textContent = totalDays + ' 天';
+    
+    updatePreview();
+}
+
+function updatePreview() {
+    // 学习模式
+    const learningMode = document.getElementById('learning_mode').value;
+    const modeNames = {
+        'long_term': '长期学习',
+        'medium': '中等模式',
+        'exam_cram': '考前冲刺'
+    };
+    document.getElementById('preview_learning_mode').textContent = modeNames[learningMode] || '中等模式';
+    
+    // 考试时间
+    const examType = document.querySelector('input[name="exam_type"]:checked').value;
+    if (examType === 'no_exam') {
+        document.getElementById('preview_exam_time').textContent = '无时间限制';
+    } else {
+        const months = parseInt(document.getElementById('exam_months').value);
+        const days = parseInt(document.getElementById('exam_days').value);
+        const totalDays = months * 30 + days;
+        document.getElementById('preview_exam_time').textContent = totalDays + ' 天后';
+    }
+    
+    // 学习时间
+    const dailyTime = document.querySelector('input[name="daily_study_time"]:checked').value;
+    const weeklyDays = document.querySelector('input[name="weekly_study_days"]:checked').value;
+    document.getElementById('preview_study_time').textContent = `每日${dailyTime}，每周${weeklyDays}天`;
+    
+    // 开始单元
+    const startUnit = document.getElementById('start_unit').value;
+    const unitNames = {
+        '1': '第1单元 - 基础词汇',
+        '2': '第2单元 - 日常用语',
+        '3': '第3单元 - 商务英语',
+        '4': '第4单元 - 学术词汇',
+        '5': '第5单元 - 高级表达'
+    };
+    document.getElementById('preview_start_unit').textContent = unitNames[startUnit] || '第1单元';
+    
+    // 预期效果
+    const effects = {
+        'long_term': '注重长期记忆，适合无时间压力的学习',
+        'medium': '平衡的记忆效果和学习效率',
+        'exam_cram': '快速掌握，适合短期备考'
+    };
+    document.getElementById('preview_effect').textContent = effects[learningMode] || '平衡的记忆效果和学习效率';
+}
+
+// 默认选择中等模式
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelector('.learning-mode-card[data-mode="medium"]').classList.add('selected');
+});
+</script>
+{% endblock %} 

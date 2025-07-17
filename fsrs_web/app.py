@@ -2347,3 +2347,204 @@ def create_card_states_for_all_users(card_id, unit_id, front, back, created_at):
         except Exception as e:
             print(f"为用户创建卡片状态失败: {e}")
             return False
+
+# 问卷相关路由
+@app.route('/questionnaire', methods=['GET', 'POST'])
+@login_required
+def questionnaire():
+    """问卷页面"""
+    if request.method == 'GET':
+        return render_template('questionnaire.html')
+    
+    # 处理问卷提交
+    data = request.form
+    
+    # 获取问卷数据
+    learning_mode = data.get('learning_mode', 'medium')
+    exam_type = data.get('exam_type', 'no_exam')
+    exam_months = int(data.get('exam_months', 0))
+    exam_days = int(data.get('exam_days', 0))
+    daily_study_time = data.get('daily_study_time', '30min')
+    weekly_study_days = int(data.get('weekly_study_days', 5))
+    start_unit = int(data.get('start_unit', 1))
+    
+    # 计算FSRS参数
+    fsrs_params = calculate_fsrs_params_from_questionnaire(
+        learning_mode, exam_type, exam_months, exam_days, 
+        daily_study_time, weekly_study_days
+    )
+    
+    # 保存问卷数据到数据库
+    if USE_DATABASE:
+        from models.database import get_db_session, UserQuestionnaire
+        session = get_db_session()
+        try:
+            # 检查是否已存在问卷数据
+            existing = session.query(UserQuestionnaire).filter_by(username=session['username']).first()
+            if existing:
+                # 更新现有数据
+                existing.learning_mode = learning_mode
+                existing.exam_months = exam_months
+                existing.exam_days = exam_days
+                existing.daily_study_time = daily_study_time
+                existing.weekly_study_days = weekly_study_days
+                existing.start_unit = start_unit
+                existing.updated_at = datetime.now()
+            else:
+                # 创建新数据
+                questionnaire_data = UserQuestionnaire(
+                    username=session['username'],
+                    learning_mode=learning_mode,
+                    exam_months=exam_months,
+                    exam_days=exam_days,
+                    daily_study_time=daily_study_time,
+                    weekly_study_days=weekly_study_days,
+                    start_unit=start_unit
+                )
+                session.add(questionnaire_data)
+            
+            session.commit()
+        except Exception as e:
+            session.rollback()
+            print(f"保存问卷数据失败: {e}")
+        finally:
+            session.close()
+    
+    # 保存FSRS参数
+    if USE_DATABASE:
+        from models.database import get_db_session, UserFSRSParam
+        session = get_db_session()
+        try:
+            # 检查是否已存在FSRS参数
+            existing = session.query(UserFSRSParam).filter_by(username=session['username']).first()
+            if existing:
+                # 更新现有参数
+                existing.set_params(fsrs_params)
+                existing.last_updated = datetime.now()
+            else:
+                # 创建新参数
+                fsrs_param = UserFSRSParam(
+                    username=session['username'],
+                    params=json.dumps(fsrs_params),
+                    last_updated=datetime.now()
+                )
+                session.add(fsrs_param)
+            
+            session.commit()
+        except Exception as e:
+            session.rollback()
+            print(f"保存FSRS参数失败: {e}")
+        finally:
+            session.close()
+    else:
+        # 文件模式保存
+        user_fsrs_params = get_user_fsrs_params()
+        user_fsrs_params.params = fsrs_params
+        user_fsrs_params.last_updated = datetime.now()
+        save_user_fsrs_params(user_fsrs_params)
+    
+    flash('问卷提交成功！你的学习计划已经个性化设置。', 'success')
+    return redirect(url_for('index'))
+
+
+def calculate_fsrs_params_from_questionnaire(learning_mode, exam_type, exam_months, 
+                                           exam_days, daily_study_time, weekly_study_days):
+    """根据问卷结果计算FSRS参数"""
+    
+    # 基础参数
+    base_params = FSRS.DEFAULT_PARAMS.copy()
+    
+    # 1. 根据学习模式调整desired_retention
+    retention_adjustments = {
+        'long_term': 0.95,    # 长期学习：高保留率
+        'medium': 0.90,       # 中等模式：平衡保留率
+        'exam_cram': 0.85     # 考前冲刺：稍低保留率，更频繁复习
+    }
+    desired_retention = retention_adjustments.get(learning_mode, 0.90)
+    
+    # 2. 根据考试时间调整maximum_interval
+    if exam_type == 'no_exam':
+        maximum_interval = 36500  # 无限制
+    else:
+        total_days = exam_months * 30 + exam_days
+        if total_days <= 30:  # 1个月内
+            maximum_interval = 7
+        elif total_days <= 90:  # 3个月内
+            maximum_interval = 30
+        elif total_days <= 180:  # 6个月内
+            maximum_interval = 90
+        elif total_days <= 365:  # 1年内
+            maximum_interval = 180
+        else:  # 超过1年
+            maximum_interval = 365
+    
+    # 3. 根据学习时间调整learning_steps
+    time_adjustments = {
+        '15min': 0.8,    # 时间少，降低学习强度
+        '30min': 1.0,    # 标准时间
+        '45min': 1.2,    # 时间充足，提高学习强度
+        '60min+': 1.4    # 时间很充足，更高强度
+    }
+    time_factor = time_adjustments.get(daily_study_time, 1.0)
+    
+    # 根据每周学习天数调整
+    days_adjustments = {
+        3: 0.7,   # 3天/周，降低强度
+        5: 1.0,   # 5天/周，标准
+        7: 1.3    # 7天/周，提高强度
+    }
+    days_factor = days_adjustments.get(weekly_study_days, 1.0)
+    
+    # 综合调整因子
+    overall_factor = time_factor * days_factor
+    
+    # 调整学习相关参数（影响新卡片的学习间隔）
+    # 参数索引对应FSRS参数中的学习相关参数
+    learning_param_indices = [0, 1, 2, 3, 4]  # 前5个参数主要影响学习阶段
+    for idx in learning_param_indices:
+        if idx < len(base_params):
+            base_params[idx] *= overall_factor
+    
+    # 4. 根据学习模式调整复习间隔参数
+    if learning_mode == 'long_term':
+        # 长期学习：增加间隔，减少复习频率
+        interval_param_indices = [5, 6, 7, 8, 9, 10]
+        for idx in interval_param_indices:
+            if idx < len(base_params):
+                base_params[idx] *= 1.2
+    elif learning_mode == 'exam_cram':
+        # 考前冲刺：减少间隔，增加复习频率
+        interval_param_indices = [5, 6, 7, 8, 9, 10]
+        for idx in interval_param_indices:
+            if idx < len(base_params):
+                base_params[idx] *= 0.8
+    
+    # 5. 添加个性化参数
+    params_dict = {
+        'desired_retention': desired_retention,
+        'maximum_interval': maximum_interval,
+        'learning_mode': learning_mode,
+        'daily_study_time': daily_study_time,
+        'weekly_study_days': weekly_study_days,
+        'exam_months': exam_months,
+        'exam_days': exam_days,
+        'base_params': base_params
+    }
+    
+    return params_dict
+
+
+def get_user_questionnaire_data():
+    """获取用户问卷数据"""
+    if USE_DATABASE:
+        from models.database import get_db_session, UserQuestionnaire
+        session = get_db_session()
+        try:
+            questionnaire = session.query(UserQuestionnaire).filter_by(username=session['username']).first()
+            if questionnaire:
+                return questionnaire.to_dict()
+        except Exception as e:
+            print(f"获取问卷数据失败: {e}")
+        finally:
+            session.close()
+    return None

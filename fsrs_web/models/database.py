@@ -121,6 +121,33 @@ class UserFSRSParam(Base):
         else:
             self.params = None
 
+# 用户问卷数据表
+class UserQuestionnaire(Base):
+    __tablename__ = 'user_questionnaire'
+    
+    username = Column(String(50), ForeignKey('users.username'), primary_key=True)
+    learning_mode = Column(String(20), nullable=False)  # 学习模式：long_term, medium, exam_cram
+    exam_months = Column(Integer, default=0)  # 距离考试月数
+    exam_days = Column(Integer, default=0)  # 距离考试天数
+    daily_study_time = Column(String(20), nullable=False)  # 每日学习时长：15min, 30min, 45min, 60min+
+    weekly_study_days = Column(Integer, nullable=False)  # 每周学习天数：3, 5, 7
+    start_unit = Column(Integer, default=1)  # 开始学习单元
+    created_at = Column(DateTime, default=datetime.now)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+    
+    def to_dict(self):
+        """转换为字典格式"""
+        return {
+            'learning_mode': self.learning_mode,
+            'exam_months': self.exam_months,
+            'exam_days': self.exam_days,
+            'daily_study_time': self.daily_study_time,
+            'weekly_study_days': self.weekly_study_days,
+            'start_unit': self.start_unit,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
+
 def initialize_db():
     """初始化数据库，创建所有表"""
     Base.metadata.create_all(engine)
