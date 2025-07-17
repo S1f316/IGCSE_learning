@@ -370,7 +370,7 @@ def login():
         password = request.form['password']
         
         # 检查是否为管理员账号
-        if username == 'S1f' and password == 'Yifan316':
+        if username == 'S1f' and password == 'Yifan0316':
             session['logged_in'] = True
             session['username'] = username
             session['is_admin'] = True

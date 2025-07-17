@@ -414,14 +414,44 @@
                     
                     // 更新统计数据
                     var stats = data.stats;
-                    document.getElementById("daily-average").textContent = stats.daily_average;
+                    
+                    // 处理daily_average，如果为undefined或NaN则显示N/A
+                    var dailyAverage = stats.daily_average;
+                    if (dailyAverage === undefined || isNaN(dailyAverage)) {
+                        dailyAverage = 'N/A';
+                    } else {
+                        dailyAverage = Math.round(dailyAverage);
+                    }
+                    document.getElementById("daily-average").textContent = dailyAverage;
                     
                     // 计算学习天数百分比
-                    var daysLearnedPercent = Math.round((stats.days_learned / stats.total_days) * 100);
-                    document.getElementById("days-learned").textContent = daysLearnedPercent + "%";
+                    var daysLearned = stats.days_learned || 0;
+                    var totalDays = stats.total_days || 1;
+                    var daysLearnedPercent = Math.round((daysLearned / totalDays) * 100);
+                    if (isNaN(daysLearnedPercent)) {
+                        daysLearnedPercent = 'N/A';
+                    } else {
+                        daysLearnedPercent = daysLearnedPercent + "%";
+                    }
+                    document.getElementById("days-learned").textContent = daysLearnedPercent;
                     
-                    document.getElementById("longest-streak").textContent = stats.longest_streak + " 天";
-                    document.getElementById("current-streak").textContent = stats.current_streak + " 天";
+                    // 处理longest_streak
+                    var longestStreak = stats.longest_streak;
+                    if (longestStreak === undefined || isNaN(longestStreak)) {
+                        longestStreak = 'N/A';
+                    } else {
+                        longestStreak = longestStreak + " 天";
+                    }
+                    document.getElementById("longest-streak").textContent = longestStreak;
+                    
+                    // 处理current_streak
+                    var currentStreak = stats.current_streak;
+                    if (currentStreak === undefined || isNaN(currentStreak)) {
+                        currentStreak = 'N/A';
+                    } else {
+                        currentStreak = currentStreak + " 天";
+                    }
+                    document.getElementById("current-streak").textContent = currentStreak;
                 })
                 .catch(error => {
                     console.error('获取复习数据失败:', error);
@@ -535,10 +565,31 @@
                 });
                 
                 // 更新统计数据
-                document.getElementById("daily-average").textContent = Math.round(totalReviews / learningDays);
-                document.getElementById("days-learned").textContent = Math.round((learningDays / totalDays) * 100) + "%";
-                document.getElementById("longest-streak").textContent = longestStreak + " 天";
-                document.getElementById("current-streak").textContent = currentStreak + " 天";
+                var dailyAverage = Math.round(totalReviews / learningDays);
+                if (isNaN(dailyAverage)) {
+                    dailyAverage = 'N/A';
+                }
+                document.getElementById("daily-average").textContent = dailyAverage;
+                
+                var daysLearnedPercent = Math.round((learningDays / totalDays) * 100);
+                if (isNaN(daysLearnedPercent)) {
+                    daysLearnedPercent = 'N/A';
+                } else {
+                    daysLearnedPercent = daysLearnedPercent + "%";
+                }
+                document.getElementById("days-learned").textContent = daysLearnedPercent;
+                
+                var longestStreakText = longestStreak + " 天";
+                if (isNaN(longestStreak)) {
+                    longestStreakText = 'N/A';
+                }
+                document.getElementById("longest-streak").textContent = longestStreakText;
+                
+                var currentStreakText = currentStreak + " 天";
+                if (isNaN(currentStreak)) {
+                    currentStreakText = 'N/A';
+                }
+                document.getElementById("current-streak").textContent = currentStreakText;
             }
         });
     </script>
