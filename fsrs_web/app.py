@@ -277,7 +277,8 @@ def register():
             users[username] = {
                 'password': hash_password(password),
                 'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                'last_login': None
+                'last_login': None,
+                'study_mode': 'medium'  # 设置默认学习模式为中等模式
             }
             
             # 保存用户数据
@@ -436,7 +437,8 @@ def admin_add_user():
     users[username] = {
         'password': hash_password(password),
         'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-        'last_login': None
+        'last_login': None,
+        'study_mode': 'medium'  # 设置默认学习模式为中等模式
     }
     
     save_users(users)
@@ -514,6 +516,11 @@ def profile():
             new_password = request.form.get('new_password')
             if new_password:
                 users[new_username if new_username else username]['password'] = hash_password(new_password)
+            
+            # 更新学习模式
+            study_mode = request.form.get('study_mode')
+            if study_mode:
+                users[new_username if new_username else username]['study_mode'] = study_mode
             
             # 处理头像上传
             if 'avatar' in request.files:
@@ -608,7 +615,10 @@ def profile():
     if 'avatar' in user_data:
         avatar_url = url_for('static', filename=user_data['avatar'])
     
-    return render_template('profile.html', stats=stats, avatar_url=avatar_url)
+    # 获取用户学习模式
+    user_mode = user_data.get('study_mode', 'medium')  # 默认为中等模式
+    
+    return render_template('profile.html', stats=stats, avatar_url=avatar_url, user_mode=user_mode)
 
 # 初始化FSRS
 fsrs = FSRS()
@@ -1046,18 +1056,21 @@ def review():
     if overdue_days > 0:
         # 根据过期天数调整稳定性，过期越久稳定性下降越多
         # 这里采用Anki类似的处理方式，但使用更平滑的衰减
-        adjusted_stability = card.memory_state.stability if card.memory_state else fsrs.INIT_STABILITY
+        user_fsrs = get_user_fsrs()  # 获取用户特定的FSRS实例
+        adjusted_stability = card.memory_state.stability if card.memory_state else user_fsrs.INIT_STABILITY
         if overdue_days > 0:
             decay_factor = 1.0 / (1.0 + 0.1 * overdue_days)  # 平滑衰减函数
             adjusted_stability *= decay_factor
-            adjusted_stability = max(fsrs.INIT_STABILITY * 0.5, adjusted_stability)  # 确保不会低于初始稳定性的一半
+            adjusted_stability = max(user_fsrs.INIT_STABILITY * 0.5, adjusted_stability)  # 确保不会低于初始稳定性的一半
     else:
-        adjusted_stability = card.memory_state.stability if card.memory_state else fsrs.INIT_STABILITY
+        user_fsrs = get_user_fsrs()  # 获取用户特定的FSRS实例
+        adjusted_stability = card.memory_state.stability if card.memory_state else user_fsrs.INIT_STABILITY
     
     # 使用调整后的稳定性计算间隔
-    hard_interval = fsrs.next_interval(adjusted_stability * 0.8 if adjusted_stability else fsrs.INIT_STABILITY * 0.8)
-    good_interval = fsrs.next_interval(adjusted_stability * 1.0 if adjusted_stability else fsrs.INIT_STABILITY * 1.0)
-    easy_interval = fsrs.next_interval(adjusted_stability * 1.3 if adjusted_stability else fsrs.INIT_STABILITY * 1.3)
+    user_fsrs = get_user_fsrs()  # 获取用户特定的FSRS实例
+    hard_interval = user_fsrs.next_interval(adjusted_stability * 0.8 if adjusted_stability else user_fsrs.INIT_STABILITY * 0.8)
+    good_interval = user_fsrs.next_interval(adjusted_stability * 1.0 if adjusted_stability else user_fsrs.INIT_STABILITY * 1.0)
+    easy_interval = user_fsrs.next_interval(adjusted_stability * 1.3 if adjusted_stability else user_fsrs.INIT_STABILITY * 1.3)
     
     return render_template('review.html', 
                           card=card,
@@ -1369,12 +1382,32 @@ def get_user_fsrs():
     if not username:
         return fsrs  # 返回默认FSRS实例
     
+    # 获取用户学习模式
+    users = load_users()
+    user_data = users.get(username, {})
+    study_mode = user_data.get('study_mode', 'medium')  # 默认为中等模式
+    
+    # 根据学习模式设置参数
+    if study_mode == 'long_term':
+        desired_retention = 0.95
+        maximum_interval = 36500
+    elif study_mode == 'cram':
+        desired_retention = 0.80
+        maximum_interval = 30
+    else:  # medium
+        desired_retention = 0.90
+        maximum_interval = 365
+    
     # 如果用户没有自己的FSRS参数，创建一个
     if username not in user_fsrs_params:
         user_fsrs_params[username] = UserFSRSParams()
     
-    # 返回用户特定的FSRS实例
-    return FSRS(params=user_fsrs_params[username].params)
+    # 返回用户特定的FSRS实例，使用学习模式对应的参数
+    return FSRS(
+        desired_retention=desired_retention,
+        maximum_interval=maximum_interval,
+        params=user_fsrs_params[username].params
+    )
 
 # 修改rate_card函数，使用用户特定的FSRS实例
 @app.route('/rate_card', methods=['POST'])
