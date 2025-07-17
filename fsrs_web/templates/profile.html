@@ -313,6 +313,16 @@
                 <input type="password" id="confirm_password" name="confirm_password" placeholder="再次输入新密码">
             </div>
             
+            <div class="form-group">
+                <label for="study_mode">学习模式</label>
+                <select id="study_mode" name="study_mode" required>
+                    <option value="long_term" {% if user_mode == 'long_term' %}selected{% endif %}>长期学习</option>
+                    <option value="medium" {% if user_mode == 'medium' %}selected{% endif %}>中等模式</option>
+                    <option value="cram" {% if user_mode == 'cram' %}selected{% endif %}>临时抱佛脚</option>
+                </select>
+                <small>不同模式影响复习频率和记忆目标</small>
+            </div>
+            
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary">保存更改</button>
             </div>
