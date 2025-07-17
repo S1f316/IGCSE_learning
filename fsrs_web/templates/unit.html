@@ -39,47 +39,62 @@
             font-weight: bold;
             margin-bottom: 15px;
             padding: 15px;
-            background-color: #f8f9fa;
+            background-color: #f5f5f5;
             border-radius: 6px;
-            border: 1px solid #e9ecef;
+            border: 1px solid #e0e0e0;
             color: #333;
             min-height: 60px;
             display: flex;
-            align-items: center;
+            flex-direction: column;
+            justify-content: center;
         }
         
         .card-front .word {
             font-size: 20px;
             font-weight: bold;
             color: #333;
+            margin-bottom: 5px;
+        }
+        
+        .card-front .part-of-speech {
+            font-size: 14px;
+            color: #333;
+            font-weight: normal;
         }
         
         .card-back {
             display: none;
             padding: 15px;
-            background-color: #f8f9fa;
+            background-color: #e3f2fd;
             border-radius: 6px;
             margin-top: 10px;
-            border: 1px solid #e9ecef;
-            border-left: 4px solid #28a745;
+            border: 1px solid #e0e0e0;
+            border-left: 4px solid #4CAF50;
         }
         
         .card-back .word {
             font-size: 20px;
             font-weight: bold;
             color: #333;
-            margin-bottom: 8px;
+            margin-bottom: 5px;
         }
         
         .card-back .part-of-speech {
             font-size: 14px;
-            color: #666;
+            color: #333;
             margin-bottom: 10px;
+            font-weight: normal;
+        }
+        
+        .card-back .chinese {
+            font-size: 16px;
+            color: #f44336;
+            margin-bottom: 8px;
         }
         
         .card-back .english {
             font-size: 14px;
-            color: #007bff;
+            color: #2196f3;
             line-height: 1.4;
         }
         
@@ -258,16 +273,17 @@
                             {{ card.front|safe }}
                         {% else %}
                             <div class="word">{{ card.front }}</div>
+                            <div class="part-of-speech">n.</div>
                         {% endif %}
                     </div>
                     
                     <!-- 卡片背面 -->
                     <div class="card-back" id="back-{{ card.id }}">
-                        {% if '<h3 class="word">' in card.back %}
-                            {{ card.back|safe }}
+                        {% if '<h3 class="word">' in card.back %}                   {{ card.back|safe }}
                         {% else %}
                             <div class="word">{{ card.front }}</div>
                             <div class="part-of-speech">n.</div>
+                            <div class="chinese">有理数</div>
                             <div class="english">A number that can be expressed as a fraction in the form a/b where a and b are integers and b not equal to 0.</div>
                         {% endif %}
                     </div>
@@ -281,7 +297,7 @@
                             {% endif %}
                         </div>
                         <div class="footer-actions">
-                            <a href="{{ url_for('edit_word', card_id=card.id) }}" class="edit-button" onclick="event.stopPropagation();">编辑</a>
+                        <a href="{{ url_for('edit_word', card_id=card.id) }}" class="edit-button" onclick="event.stopPropagation();">编辑</a>
                             <a href="#" class="restore-button" onclick="event.stopPropagation(); restoreCard('{{ card.id }}')">还原</a>
                         </div>
                     </div>
