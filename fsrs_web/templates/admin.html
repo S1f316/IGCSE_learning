@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>管理员界面</title>
+</head>
+<body>
+    <h1>管理员界面</h1>
+    <h2>管理员账号</h2>
+    <p>用户名: S1f</p>
+    <p>密码: Yifan0316</p>
+    <hr>
+    <h2>添加新用户</h2>
+    <form id="addUserForm">
+        <label>用户名: <input type="text" name="username" required></label>
+        <label>密码: <input type="text" name="password" required></label>
+        <button type="submit">添加</button>
+    </form>
+    <div id="addMessage"></div>
+    <hr>
+    <h2>用户列表</h2>
+    <table border="1" cellpadding="5">
+        <thead>
+            <tr>
+                <th>用户名</th>
+                <th>创建时间</th>
+                <th>最后登录</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for username, user_data in users.items() %}
+            <tr>
+                <td>{{ username }}</td>
+                <td>{{ user_data.created_at or '未知' }}</td>
+                <td>{{ user_data.last_login or '从未登录' }}</td>
+                <td>
+                    {% if username != 'S1f' %}
+                    <button onclick="deleteUser('{{ username }}')">删除</button>
+                    {% else %}
+                    管理员账号
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <div id="deleteMessage"></div>
+    <hr>
+    <a href="{{ url_for('logout') }}">退出登录</a>
+    <script>
+    // 添加用户
+    document.getElementById('addUserForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const formData = new FormData(this);
+        fetch('/admin/add_user', {
+            method: 'POST',
+            body: formData
+        })
+        .then(r => r.json())
+        .then(data => {
+            document.getElementById('addMessage').textContent = data.message;
+            if(data.status === 'success') setTimeout(() => location.reload(), 1000);
+        });
+    });
+    // 删除用户
+    function deleteUser(username) {
+        if(!confirm('确定要删除用户 ' + username + ' 吗？')) return;
+        const formData = new FormData();
+        formData.append('username', username);
+        fetch('/admin/delete_user', {
+            method: 'POST',
+            body: formData
+        })
+        .then(r => r.json())
+        .then(data => {
+            document.getElementById('deleteMessage').textContent = data.message;
+            if(data.status === 'success') setTimeout(() => location.reload(), 1000);
+        });
+    }
+    </script>
+</body>
+</html> 

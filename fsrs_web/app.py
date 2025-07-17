@@ -368,6 +368,13 @@ def login():
         username = request.form['username']
         password = request.form['password']
         
+        # 检查是否为管理员账号
+        if username == 'S1f' and password == 'Yifan316':
+            session['logged_in'] = True
+            session['username'] = username
+            session['is_admin'] = True
+            return redirect(url_for('admin'))
+        
         # 加载用户数据
         users = load_users()
         
@@ -375,6 +382,7 @@ def login():
         if username in users and users[username]['password'] == hash_password(password):
             session['logged_in'] = True
             session['username'] = username
+            session['is_admin'] = False
             
             # 更新最后登录时间
             users[username]['last_login'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -395,6 +403,68 @@ def logout():
     """用户登出"""
     session.clear()
     return redirect(url_for('login'))
+
+@app.route('/admin')
+def admin():
+    """管理员界面"""
+    # 检查是否为管理员
+    if not session.get('is_admin'):
+        return redirect(url_for('login'))
+    
+    # 加载所有用户数据
+    users = load_users()
+    
+    return render_template('admin.html', users=users)
+
+@app.route('/admin/add_user', methods=['POST'])
+def admin_add_user():
+    """管理员添加用户"""
+    if not session.get('is_admin'):
+        return jsonify({'status': 'error', 'message': '权限不足'})
+    
+    username = request.form.get('username')
+    password = request.form.get('password')
+    if not username or not password:
+        return jsonify({'status': 'error', 'message': '用户名和密码不能为空'})
+    
+    users = load_users()
+    
+    if username in users:
+        return jsonify({'status': 'error', 'message': '用户名已存在'})
+    
+    # 添加新用户
+    users[username] = {
+        'password': hash_password(password),
+        'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        'last_login': None
+    }
+    
+    save_users(users)
+    return jsonify({'status': 'success', 'message': '用户添加成功'})
+
+@app.route('/admin/delete_user', methods=['POST'])
+def admin_delete_user():
+    """管理员删除用户"""
+    if not session.get('is_admin'):
+        return jsonify({'status': 'error', 'message': '权限不足'})
+    
+    username = request.form.get('username')
+    if not username:
+        return jsonify({'status': 'error', 'message': '用户名不能为空'})
+    
+    if username == 'S1f':
+        return jsonify({'status': 'error', 'message': '不能删除管理员账号'})
+    
+    users = load_users()
+    
+    if username not in users:
+        return jsonify({'status': 'error', 'message': '用户不存在'})
+    
+    # 删除用户
+    del users[username]
+    save_users(users)
+    
+    return jsonify({'status': 'success', 'message': '用户删除成功'})
 
 @app.route('/profile', methods=['GET', 'POST'])
 @login_required
